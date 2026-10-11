@@ -102,7 +102,7 @@ class CastAdditionalCosts(
             if (action.altAllows(AlternativeCostType.ESCAPE) &&
                 zoneResolver.hasEscapePermission(state, action.playerId, action.cardId)
             ) {
-                EscapeCasts.printedEscape(cardDef)
+                EscapeCasts.effectiveEscape(state, action.cardId, cardDef, action.playerId, cardRegistry, predicateEvaluator)
                     ?.additionalCost
                     ?.let { add(it) }
             }

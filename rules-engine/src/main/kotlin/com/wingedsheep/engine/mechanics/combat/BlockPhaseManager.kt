@@ -367,7 +367,7 @@ internal class BlockPhaseManager(
 
         val blockerNameMap = expandedBlockers.keys.associateWith { nameVisibleToAll(state, it, state.getEntity(it)?.get<CardComponent>()?.name ?: "Creature") }
         val attackerNameMap = expandedBlockers.values.flatten().distinct().associateWith { nameVisibleToAll(state, it, state.getEntity(it)?.get<CardComponent>()?.name ?: "Creature") }
-        val blockersEvent = BlockersDeclaredEvent(expandedBlockers, blockerNameMap, attackerNameMap)
+        val blockersEvent = BlockersDeclaredEvent(expandedBlockers, blockerNameMap, attackerNameMap, blockingPlayer)
         val blockTaxEvents = taxEvents
 
         // There is no damage-assignment order to collect (CR 510.1c/d divide damage freely). The

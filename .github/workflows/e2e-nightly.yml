@@ -1,9 +1,9 @@
 name: E2E Nightly
 
+# Manual only: the nightly schedule was dropped because the suite fails consistently.
+# Restore a `schedule:` trigger once it's green again.
 on:
-  schedule:
-    - cron: '0 3 * * *'  # 3:00 AM UTC daily
-  workflow_dispatch:       # Allow manual triggers
+  workflow_dispatch:
 
 jobs:
   e2e:

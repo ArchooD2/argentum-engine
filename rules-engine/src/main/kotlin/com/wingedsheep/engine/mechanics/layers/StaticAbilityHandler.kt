@@ -1180,6 +1180,9 @@ class StaticAbilityHandler(
             // Cast-time optional additional mana (AdditionalManaForCounters / CastSpellHandler /
             // CastSpellEnumerator; counters placed by StackResolver):
             is com.wingedsheep.sdk.scripting.AdditionalManaForEntryCounters,
+            // Cast-time granted offspring (OffspringGrants / CastSpellEnumerator / CastValidator;
+            // the token-copy trigger is synthesized by TriggerAbilityResolver):
+            is com.wingedsheep.sdk.scripting.GrantOffspringToOwnSpells,
 
             // Activated abilities (ActivateAbilityHandler / ActivatedAbilityEnumerator):
             is ExtraLoyaltyActivation,

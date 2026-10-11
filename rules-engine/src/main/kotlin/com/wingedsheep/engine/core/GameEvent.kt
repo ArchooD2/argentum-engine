@@ -308,6 +308,20 @@ data class CitysBlessingGainedEvent(
 ) : GameEvent
 
 /**
+ * The monarch changed hands (CR 725). [previousMonarchId] is `null` when the game had no monarch
+ * yet (CR 725.1); [newMonarchId] is `null` only when the monarch left the game and no player still
+ * in it could take the title (CR 725.4). [sourceName] attributes the change — the card whose effect
+ * crowned a player, the inherent combat-damage steal (CR 725.2), or the leave-the-game hand-off.
+ */
+@Serializable
+@SerialName("MonarchChangedEvent")
+data class MonarchChangedEvent(
+    val previousMonarchId: EntityId?,
+    val newMonarchId: EntityId?,
+    val sourceName: String
+) : GameEvent
+
+/**
  * A player gained an enduring story (The Hobbit, CR 702.195).
  *
  * Fired by the storied state-based action the first time its controller controls three or more

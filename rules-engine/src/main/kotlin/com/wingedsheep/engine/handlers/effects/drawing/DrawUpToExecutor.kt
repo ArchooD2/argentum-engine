@@ -24,6 +24,7 @@ import kotlin.reflect.KClass
  * subsequent pipeline effects to reference it via DynamicAmount.VariableReference.
  */
 class DrawUpToExecutor(
+    private val drawPrimitive: DrawCardPrimitive,
     private val decisionHandler: DecisionHandler = DecisionHandler()
 ) : EffectExecutor<DrawUpToEffect> {
 
@@ -43,7 +44,9 @@ class DrawUpToExecutor(
 
         val libraryZone = ZoneKey(playerId, Zone.LIBRARY)
         val librarySize = state.getZone(libraryZone).size
-        val actualMax = effect.maxCards.coerceAtMost(librarySize)
+        // A per-turn draw cap (CR 121.2b) means the player can't choose to draw more than it allows.
+        val drawsLeft = drawPrimitive.drawsLeftThisTurn(state, playerId) ?: Int.MAX_VALUE
+        val actualMax = effect.maxCards.coerceAtMost(librarySize).coerceAtMost(drawsLeft)
 
         if (actualMax == 0) {
             // Can't draw any cards — store max not drawn and return

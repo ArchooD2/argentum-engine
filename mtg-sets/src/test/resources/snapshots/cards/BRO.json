@@ -10809,7 +10809,7 @@
                     "type": "Composite",
                     "effects": [
                         {
-                            "type": "ReduceSpellCosts",
+                            "type": "ModifySpellCosts",
                             "spellFilter": {
                                 "cardPredicates": [
                                     {

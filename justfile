@@ -5,15 +5,15 @@
 default:
     @just --list
 
-# Build the entire project
+# Build the project, excluding deprecated mtgish tests (explicit coverage commands still run them)
 [group: 'build']
 build:
-    scripts/gradle-locked build
+    scripts/gradle-locked build -x :mtgish-tooling:test
 
-# Run all tesats
+# Run all tests except deprecated mtgish tests
 [group: 'build']
 test:
-    scripts/gradle-locked test
+    scripts/gradle-locked test -x :mtgish-tooling:test
 
 # Card scenarios now live in the per-era `:mtg-sets:<era>:tests` modules, which `:mtg-sets:scenarioTest`
 # fans out to, so both are run here — same coverage as before the split.
@@ -249,10 +249,10 @@ prune-worktrees DAYS="7" *ARGS:
 kill-daemons MIN_AGE="60" *ARGS:
     scripts/kill-stale-daemons.sh --min-age {{MIN_AGE}} {{ARGS}}
 
-# Format and check code
+# Format and check code, excluding deprecated mtgish tests
 [group: 'build']
 check:
-    ./gradlew check
+    scripts/gradle-locked check -x :mtgish-tooling:test
 
 # What every agent loop is doing now, its last result, and its open PR (--all for older loops)
 [group: 'ai']

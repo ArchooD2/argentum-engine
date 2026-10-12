@@ -55,6 +55,8 @@ export type {
   ClientPlayerEffect,
   ClientEffectProgress,
   ClientCommanderDamage,
+  ClientDungeon,
+  ClientDungeonRoom,
   ClientCardEffect,
   ClientRuling,
   ClientManaPool,

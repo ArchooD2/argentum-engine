@@ -8,6 +8,8 @@ import com.wingedsheep.engine.state.components.battlefield.*
 import com.wingedsheep.engine.state.components.identity.*
 import com.wingedsheep.engine.state.components.player.*
 import com.wingedsheep.engine.view.ClientCommanderDamage
+import com.wingedsheep.engine.view.ClientDungeon
+import com.wingedsheep.engine.view.ClientDungeonRoom
 import com.wingedsheep.engine.view.ClientManaPool
 import com.wingedsheep.engine.view.ClientPlayer
 import com.wingedsheep.engine.view.ClientRestrictedManaEntry
@@ -88,8 +90,22 @@ internal class PlayerProjector(
             teamIndex = container?.get<TeamComponent>()?.teamIndex,
             teamSharedLife = state.format.sharesTeamLife,
             teamSharedTurns = state.format.sharesTeamTurns,
+            // CR 309 — the dungeon card and its venture marker are public.
+            dungeon = dungeon(container?.get<DungeonProgressComponent>()?.current),
+            completedDungeons = container?.get<DungeonProgressComponent>()?.completed.orEmpty(),
             // CR 103.2b — a revealed companion is public while it waits outside the game.
             companionId = state.companionOutsideGame(playerId)
+        )
+    }
+
+    private fun dungeon(marker: DungeonMarker?): ClientDungeon? {
+        marker ?: return null
+        val definition = com.wingedsheep.sdk.dungeons.Dungeons.byName(marker.dungeon) ?: return null
+        return ClientDungeon(
+            name = definition.name,
+            imageUri = definition.imageUri,
+            currentRoom = marker.room,
+            rooms = definition.rooms.map { ClientDungeonRoom(it.name, it.text, it.leadsTo) }
         )
     }
 

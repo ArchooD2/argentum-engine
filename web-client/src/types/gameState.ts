@@ -745,6 +745,31 @@ export interface ClientPlayer {
    * every viewer. Shown beside the command zone.
    */
   readonly companionId?: EntityId | null
+  /**
+   * The dungeon this player owns in the command zone and where their venture marker is (CR 309),
+   * or absent when they aren't in a dungeon. Public — everyone sees every player's dungeon.
+   */
+  readonly dungeon?: ClientDungeon | null
+  /** Names of the dungeons this player has completed, in order (CR 309.7). */
+  readonly completedDungeons?: readonly string[]
+}
+
+/**
+ * A player's dungeon (CR 309): the whole room graph plus the room the venture marker is on.
+ * Matches backend ClientDungeon.kt.
+ */
+export interface ClientDungeon {
+  readonly name: string
+  readonly imageUri?: string | null
+  readonly currentRoom: number
+  readonly rooms: readonly ClientDungeonRoom[]
+}
+
+/** One room: its name, printed effect, and the room indices its arrows lead to (empty = bottom). */
+export interface ClientDungeonRoom {
+  readonly name: string
+  readonly text: string
+  readonly leadsTo: readonly number[]
 }
 
 /**

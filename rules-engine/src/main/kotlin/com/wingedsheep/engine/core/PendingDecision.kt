@@ -179,8 +179,63 @@ data class TargetRequirementInfo(
     /** Player-facing meaning of leaving this optional slot empty. */
     @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
     @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
-    val emptyChoiceLabel: String? = null
+    val emptyChoiceLabel: String? = null,
+    /**
+     * Server-computed choices for a slot whose filter reads an earlier target ("target land that
+     * player controls" on a copy of The Fall of Kroog), keyed by [targetPrefixKey] over the first
+     * [prefixLength] slots. When set it replaces [ChooseTargetsDecision.legalTargets] for this slot;
+     * that entry is the union, kept for display. Read it through [ChooseTargetsDecision.legalTargetsFor].
+     */
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    val legalTargetsByPrefix: Map<String, List<EntityId>>? = null,
+    /** How many leading slots key [legalTargetsByPrefix]; defaults to every earlier slot. */
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    val prefixLength: Int? = null,
 )
+
+/**
+ * Key of [TargetRequirementInfo.legalTargetsByPrefix]: each of the first [length] slots' picks
+ * comma-joined, slots joined by commas, an empty slot (a kept copy target) contributing "".
+ */
+fun targetPrefixKey(chosen: Map<Int, List<EntityId>>, length: Int): String =
+    (0 until length).joinToString(",") { slot -> chosen[slot].orEmpty().joinToString(",") }
+
+/** Legal choices for slot [index] given the picks already made for earlier slots. */
+fun ChooseTargetsDecision.legalTargetsFor(index: Int, chosen: Map<Int, List<EntityId>>): List<EntityId> {
+    val table = targetRequirements.firstOrNull { it.index == index }?.legalTargetsByPrefix
+        ?: return legalTargets[index].orEmpty()
+    val requirement = targetRequirements.first { it.index == index }
+    return table[targetPrefixKey(chosen, requirement.prefixLength ?: index)].orEmpty()
+}
+
+/** The first `minTargets` legal picks per slot, chosen in slot order so a later slot reads earlier ones. */
+fun ChooseTargetsDecision.minimalSelection(): Map<Int, List<EntityId>> =
+    targetRequirements.fold(emptyMap()) { chosen, req ->
+        chosen + (req.index to legalTargetsFor(req.index, chosen).take(req.minTargets))
+    }
+
+/**
+ * Re-pick, minimally, every slot after [index] whose answer the earlier slots no longer allow —
+ * changing who "target opponent" names unseats "target land that player controls". A kept copy
+ * target behind a changed one may be unseated too (CR 115.7d), so it is changed to a legal pick
+ * when there is one; with none, the engine offered the change only because keeping stays legal.
+ */
+fun ChooseTargetsDecision.repairSlotsAfter(index: Int, chosen: Map<Int, List<EntityId>>): Map<Int, List<EntityId>> {
+    if (targetRequirements.none { it.legalTargetsByPrefix != null }) return chosen
+    return targetRequirements.filter { it.index > index }.fold(chosen) { acc, req ->
+        val legal = legalTargetsFor(req.index, acc)
+        val answer = acc[req.index].orEmpty()
+        val keptBehindChange = answer.isEmpty() && req.legalTargetsByPrefix != null &&
+            (0 until (req.prefixLength ?: req.index)).any { acc[it].orEmpty().isNotEmpty() }
+        when {
+            keptBehindChange -> acc + (req.index to legal.take(maxOf(req.minTargets, 1)))
+            legal.containsAll(answer) -> acc
+            else -> acc + (req.index to legal.take(req.minTargets))
+        }
+    }
+}
 
 /**
  * Player must select cards from a set (e.g., discard, sacrifice, search library).

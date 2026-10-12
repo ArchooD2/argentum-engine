@@ -148,10 +148,10 @@ class GamePlayHandler(
             message.setCode ?: deckGenerator.randomSetCode()
         } else null
 
-        val baseDeck = if (quickGameSetCode != null) {
-            val randomDeck = deckGenerator.generate(quickGameSetCode)
-            logger.info("Generated random deck for ${playerSession.playerName} from set $quickGameSetCode: ${randomDeck.entries.take(5)}... (${randomDeck.values.sum()} cards)")
-            randomDeck
+        val randomDeck = quickGameSetCode?.let { deckGenerator.generateDeck(it) }
+        val baseDeck = if (randomDeck != null) {
+            logger.info("Generated random deck for ${playerSession.playerName} from set $quickGameSetCode: ${randomDeck.deckList.entries.take(5)}... (${randomDeck.deckList.values.sum()} cards)")
+            randomDeck.deckList
         } else {
             message.deckList
         }
@@ -167,15 +167,12 @@ class GamePlayHandler(
             tokenArtRegistry = tokenArtRegistry,
         )
         gameSession.quickGameSetCode = quickGameSetCode
-        // A generated random/quick deck has no sideboard; only a real submitted deck carries one.
-        // Sanitize whatever the client sent: an unimplemented name would throw out of
+        // A generated random/quick deck's sideboard is the rest of its sealed pool (CR 100.4b).
+        // Sanitize whatever a submitted deck sent: an unimplemented name would throw out of
         // GameInitializer and fail the game creation outright (see SideboardSanitizer).
-        val sideboard = if (quickGameSetCode != null) {
-            emptyMap()
-        } else {
-            sanitizeSideboard(message.sideboard, playerSession.playerName)
-        }
-        val companion = if (quickGameSetCode != null) null else sanitizeCompanion(message.companion)
+        val sideboard = randomDeck?.sideboard
+            ?: sanitizeSideboard(message.sideboard, playerSession.playerName)
+        val companion = if (randomDeck != null) null else sanitizeCompanion(message.companion)
         gameSession.addPlayer(playerSession, deckList, sideboard = sideboard, companion = companion)
 
         // Store player info for persistence
@@ -303,25 +300,23 @@ class GamePlayHandler(
             return
         }
 
-        val baseDeck = if (message.deckList.isEmpty()) {
+        val randomDeck = if (message.deckList.isEmpty()) {
             val setCode = gameSession.quickGameSetCode ?: deckGenerator.randomSetCode()
-            val randomDeck = deckGenerator.generate(setCode)
-            logger.info("Generated random deck for ${playerSession.playerName} from set $setCode: ${randomDeck.entries.take(5)}... (${randomDeck.values.sum()} cards)")
-            randomDeck
+            deckGenerator.generateDeck(setCode).also {
+                logger.info("Generated random deck for ${playerSession.playerName} from set $setCode: ${it.deckList.entries.take(5)}... (${it.deckList.values.sum()} cards)")
+            }
         } else {
-            message.deckList
+            null
         }
+        val baseDeck = randomDeck?.deckList ?: message.deckList
         val deckList = EasterEggDeckInjector.maybeInjectEasterEggs(
             playerSession.playerName, baseDeck, gameProperties.easterEggs.enabled
         )
 
-        // A generated random deck (empty submission) has no sideboard.
-        val sideboard = if (message.deckList.isEmpty()) {
-            emptyMap()
-        } else {
-            sanitizeSideboard(message.sideboard, playerSession.playerName)
-        }
-        val companion = if (message.deckList.isEmpty()) null else sanitizeCompanion(message.companion)
+        // A generated random deck (empty submission) brings the rest of its sealed pool.
+        val sideboard = randomDeck?.sideboard
+            ?: sanitizeSideboard(message.sideboard, playerSession.playerName)
+        val companion = if (randomDeck != null) null else sanitizeCompanion(message.companion)
         gameSession.addPlayer(playerSession, deckList, sideboard = sideboard, companion = companion)
 
         // Store player info for persistence

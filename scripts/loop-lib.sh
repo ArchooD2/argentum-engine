@@ -45,25 +45,8 @@ LOOP_PR_PROTOCOL="PR LIFECYCLE — every PR is reviewed BEFORE it is opened, so 
      --delete-branch\` (from the main checkout, after \`git worktree remove\` of its worktree), then do the merge
      bookkeeping below. Then DON'T stop: \`git fetch\` and carry on in this same session with the build step the
      updated state calls for, so the next PR is already open by the time you finish.
-  e. CI still pending or running -> nothing to do for that PR. Unless PIPELINING below lets you build the next unit,
-     answer WAITING_CI."
-
-# Prompt rules for running more than one PR at a time. $1 is the cap on open PRs.
-loop_pipeline_protocol() {
-  [ "${1:-1}" -gt 1 ] || return 0
-  cat <<EOF
-PIPELINING — up to $1 of our PRs may be open at once, so the next unit is built while CI runs on the last one:
-- First handle every open PR of ours that needs work (PR LIFECYCLE a-d), oldest first.
-- Then, while fewer than $1 of our PRs are open, the build steps' "No PR open" condition counts as met: build the
-  next unit from fresh origin/main.
-- Never build on unmerged work. Skip a gap whose deps include a gap still in review, cards only an in-review gap
-  unlocks, cards an open PR already adds, a second Assay sweep while one is open, and the finishing PR while any PR
-  of ours is open. If nothing else is buildable, answer WAITING_CI.
-- With $1 PRs open and none needing work, answer WAITING_CI.
-- After the older PR merges, the newer one often conflicts on snapshot goldens or backlog checklists. That is
-  routine lifecycle b: rebase and regenerate, never hand-merge.
-EOF
-}
+  e. CI still pending or running -> nothing to do; answer WAITING_CI. Never start the next unit while a PR of
+     ours is open."
 
 # Our open PRs by branch prefix, oldest first.
 loop_open_prs() {
@@ -91,23 +74,16 @@ loop_wait_ci() {
 }
 
 # Decides whether the next session can start now. Sets LOOP_PRS to our open PRs.
-#   $1 branch prefix   $2 cap on open PRs   $3 the previous session's last line
-# A session starts at once when no PR is open or one needs work (CI finished). When every open PR
-# is still in CI, it starts anyway while fewer than the cap are open — it builds the next unit
-# meanwhile — unless the last session already said there was nothing to build (WAITING_CI).
-# Otherwise this waits out CI on the oldest.
+#   $1 branch prefix
+# A session starts at once when no PR is open or one needs work (CI finished); otherwise this waits
+# out CI on the oldest. One PR at a time: the next unit is never built while CI runs on the last.
 loop_await_turn() {
-  local prefix=$1 max=$2 last=${3:-} pr count=0
+  local prefix=$1 pr
   LOOP_PRS=$(loop_open_prs "$prefix" | sort -n | xargs)
   [ -n "$LOOP_PRS" ] || return 0
   for pr in $LOOP_PRS; do
-    count=$((count + 1))
     loop_ci_pending "$pr" || return 0
   done
-  if [ "$count" -lt "$max" ] && [[ "$last" != WAITING_CI* ]]; then
-    log "PR #${LOOP_PRS// /, #} in CI — building the next unit meanwhile"
-    return 0
-  fi
   loop_wait_ci "${LOOP_PRS%% *}"
 }
 

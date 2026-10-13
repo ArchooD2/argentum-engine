@@ -107,8 +107,6 @@ RUNS="$REPO/.claude/loop-runs"
 mkdir -p "$RUNS"
 # shellcheck source=loop-lib.sh
 source "$(dirname "$0")/loop-lib.sh"
-# Open PRs at once: the next unit is built while CI runs on the last. 1 = strictly one at a time.
-LOOP_MAX_OPEN=${LOOP_MAX_OPEN:-2}
 loop_maybe_tui "$CODE" "$0" "$CODE" "$(loop_model_arg)" ${PRIORITY:+"$PRIORITY"}
 
 PROMPT="You are one iteration of an unattended loop implementing MTG set '$CODE' (Scryfall code).
@@ -174,7 +172,8 @@ worktree (recreate it with \`git worktree add\` if missing). Never work in the m
    with half, if more than eight cards) that reads the add-card skill and SDK reference once and implements
    the cards one after another, writing files only — no git, no `just`, no builds; the single gate below is the
    only build. Use the add-card skill (one definition file and one scenario test file per card). A card that turns out to need
-   new vocabulary is dropped from the batch and added to '## Gaps' as a new \`[ ]\` gap — the next iteration builds
+   new vocabulary — or could only ship as a \"known approximation\" (an engine path, mana type or event that
+   doesn't match the printed text exactly) — is dropped from the batch and added to '## Gaps' as a new \`[ ]\` gap — the next iteration builds
    it before more cards. Gate once with \`just loop-gate\`, commit, review, push, open a PR titled
    '[agent-loop: $MODEL] Add <N> <set name> cards' whose body lists the cards, the gate run, and that nothing was
    play-tested. Record the unit in the ledger.
@@ -230,7 +229,6 @@ and carry on. Only answer STUCK when the failure is inside code your unit change
 failure is a trivial stale test, you may fix it in a separate one-commit PR.
 
 $LOOP_PR_PROTOCOL
-$(loop_pipeline_protocol "$LOOP_MAX_OPEN")
 
 A human watches your text live, one line at a time, so keep them posted in short lines (under 150 chars each):
 - once you know which step you're taking: 'Working on: <step and unit, e.g. step 6, G3 splice onto Arcane>'
@@ -325,7 +323,7 @@ log "set-loop $CODE started (harness $HARNESS, model $MODEL, log $RUNS/$CODE.log
 N=0
 while [ ! -e "$RUNS/$CODE.stop" ]; do
   N=$((N + 1))
-  loop_await_turn "loop-$CODE-" "$LOOP_MAX_OPEN" "${LAST:-}"
+  loop_await_turn "loop-$CODE-"
   PR=$LOOP_PRS
   [ -e "$RUNS/$CODE.stop" ] && break
 

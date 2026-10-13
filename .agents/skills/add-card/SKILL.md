@@ -30,7 +30,8 @@ Given several card names:
 - Run **Step 10's gate once**, at the end, for the whole batch. Don't gate per card.
 - **A card that turns out to need new SDK vocabulary leaves the batch** the moment Step 4 says so. Reset
   its commit, report it as dropped, and ship the rest. Do not grow the PR to cover it, and do not
-  fake it with an existing primitive that only works in the common case.
+  fake it with an existing primitive that only works in the common case. A card that could only ship
+  with a "known approximation" is such a card.
 
 Three things stay strictly per-card no matter the batch size: its own `{CardName}.kt`, its own
 `{CardName}ScenarioTest.kt` where Step 5 calls for a test (**never** a shared `{Something}BatchScenarioTest`
@@ -48,7 +49,7 @@ Model exactly what the card does under the Comprehensive Rules, not a convenient
   needs new vocabulary, build it properly (Step 4).
 - **Don't drop edge cases** — "may" declines, fizzles, the source leaving the battlefield, zero/empty
   inputs, simultaneous triggers, replacement interactions, layer/timestamp ordering. If you can't cover
-  an interaction, say so; don't silently skip it.
+  an interaction, the card isn't ready — it needs Step 4, or it leaves the batch.
 - **Don't approximate timing** — cast-time vs resolution-time choices, intervening "if" clauses,
   last-known information, turn/step boundaries. Follow the rules and Scryfall rulings, not what's easiest
   to wire up.
@@ -56,7 +57,9 @@ Model exactly what the card does under the Comprehensive Rules, not a convenient
   isn't "target".
 
 When the faithful implementation is more work than the shortcut, do the work — or stop and tell the user
-what's missing. **A card that looks right but resolves wrong is worse than an unimplemented one.**
+what's missing. **There is no "known approximation".** A KDoc or PR body that lists one ("slightly wider
+than the printed text", "a plain draw instead of the connive event when…") is a card shipped wrong with a
+note attached. Fix the gap or drop the card; never document it and ship. **A card that looks right but resolves wrong is worse than an unimplemented one.**
 
 ## Step 0: read the card with Assay — fail fast
 

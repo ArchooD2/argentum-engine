@@ -312,7 +312,9 @@ body documents why that's out of scope.
 (`https://api.scryfall.com/cards/named?exact=<card>` — fetch with Python `urllib` if
 `WebFetch` is blocked); the PR may implement pre-errata wording. Spell out the rules path
 for corner cases (Changeling, copyable values, layer interactions, "as ~ enters",
-protection / hexproof / ward).
+protection / hexproof / ward). **Blocking:** any card whose KDoc, comments or PR body admits
+an approximation ("known approximation", "slightly wider than the printed text", "close
+enough") — the fix is to implement it faithfully or drop the card, never to keep the note.
 
 **Tests — every cited rule must be exercised.**
 

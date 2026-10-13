@@ -52,7 +52,7 @@ echo '{"type":"result","result":"SET_COMPLETE","num_turns":1,"duration_ms":1000}
 
     def run_loop(self, *args, model="", mode="", verdict="SET_COMPLETE", set_code="ecl"):
         env = dict(os.environ, PATH=f"{self.bin}:{os.environ['PATH']}",
-                   TEST_ROOT=str(self.root), MODEL=model, MODE=mode, VERDICT=verdict)
+                   TEST_ROOT=str(self.root), HOME=str(self.root), MODEL=model, MODE=mode, VERDICT=verdict)
         return subprocess.run(["bash", str(self.bin / "set-loop"), set_code, *args],
                               cwd=self.root, env=env, capture_output=True, text=True, timeout=10)
 
@@ -178,6 +178,16 @@ echo '{"type":"result","result":"SET_COMPLETE","num_turns":1,"duration_ms":1000}
                 result = self.run_loop("astra", **options)
                 self.assertEqual(result.returncode, 1, result.stdout)
                 self.assertFalse((self.root / "sleeps").exists())
+
+    def test_stale_stop_file_from_a_dead_run_is_cleared(self):
+        runs = self.root / ".claude" / "loop-runs"
+        runs.mkdir(parents=True)
+        (runs / "ecl.stop").touch()
+        result = self.run_loop("claude-opus-5-5")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("removed a stale ecl.stop", result.stdout)
+        self.assertIn("set ecl complete", result.stdout)
+        self.assertNotIn("stop file found", result.stdout)
 
     def test_usage_limit_waits_then_honors_stop_file(self):
         result = self.run_loop("astra", mode="limit")

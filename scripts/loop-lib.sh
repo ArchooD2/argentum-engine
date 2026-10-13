@@ -113,6 +113,19 @@ loop_model_arg() {
   if [ "$HARNESS" = codex ]; then echo "codex:$MODEL"; else echo "$MODEL"; fi
 }
 
+# A stop file is only consumed when the loop gets back to its check, so one touched for a run that
+# then died (Ctrl-C, closed terminal, STUCK) outlives it and would stop the next run before its
+# first step. Called at startup, before the pid file is rewritten: $1 the stop file, $2 the pid
+# file. A stop file is kept while the pid it belongs to is still alive.
+loop_clear_stale_stop() {
+  local stop=$1 pidfile=$2 pid
+  [ -e "$stop" ] || return 0
+  pid=$(cat "$pidfile" 2>/dev/null)
+  if [ -n "$pid" ] && [ "$pid" != $$ ] && kill -0 "$pid" 2>/dev/null; then return 0; fi
+  rm -f "$stop"
+  echo "[$(date '+%F %T')] removed a stale $(basename "$stop") left by an earlier run"
+}
+
 # Machine-wide cap on concurrent loop sessions, across every loop and set. Each session runs its
 # own gate builds and subagents, so two loops working at once double the build load and the token
 # burn. Loops queue for a slot and take turns, one session each. Same shlock scheme as

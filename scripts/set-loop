@@ -286,6 +286,7 @@ fi
 LOGDIR="$RUNS/$CODE-logs"
 mkdir -p "$LOGDIR"
 exec > >(tee -a "$RUNS/$CODE.log") 2>&1
+loop_clear_stale_stop "$RUNS/$CODE.stop" "$RUNS/$CODE.pid"
 # `just loops` reads this to tell a running loop from a finished one.
 echo $$ > "$RUNS/$CODE.pid"
 # Only remove the pid file if it is still ours.

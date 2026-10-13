@@ -48,7 +48,7 @@ echo "{\\"type\\":\\"result\\",\\"result\\":\\"$VERDICT\\",\\"num_turns\\":1,\\"
 
     def run_loop(self, *args, model="", mode="", verdict="COMMANDER_COMPLETE"):
         env = dict(os.environ, PATH=f"{self.bin}:{os.environ['PATH']}",
-                   TEST_ROOT=str(self.root), MODEL=model, MODE=mode, VERDICT=verdict)
+                   TEST_ROOT=str(self.root), HOME=str(self.root), MODEL=model, MODE=mode, VERDICT=verdict)
         return subprocess.run(["bash", str(self.bin / "commander-loop"), *args],
                               cwd=self.root, env=env, capture_output=True, text=True, timeout=10)
 

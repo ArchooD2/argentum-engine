@@ -210,6 +210,7 @@ fi
 LOGDIR="$RUNS/assay-logs"
 mkdir -p "$LOGDIR"
 exec > >(tee -a "$RUNS/assay.log") 2>&1
+loop_clear_stale_stop "$RUNS/assay.stop" "$RUNS/assay.pid"
 # `just loops` reads this to tell a running loop from a finished one.
 echo $$ > "$RUNS/assay.pid"
 trap 'rm -f "$RUNS/assay.pid"' EXIT

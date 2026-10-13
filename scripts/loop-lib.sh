@@ -112,3 +112,54 @@ loop_maybe_tui() {
 loop_model_arg() {
   if [ "$HARNESS" = codex ]; then echo "codex:$MODEL"; else echo "$MODEL"; fi
 }
+
+# Machine-wide cap on concurrent loop sessions, across every loop and set. Each session runs its
+# own gate builds and subagents, so two loops working at once double the build load and the token
+# burn. Loops queue for a slot and take turns, one session each. Same shlock scheme as
+# scripts/gradle-locked: a slot held by a dead process is reclaimed automatically.
+LOOP_SESSION_SLOTS=${LOOP_SESSION_SLOTS:-1}
+LOOP_SESSION_LOCK=""
+_loop_session_base="$HOME/.cache/argentum/loop-session.lock"
+
+# Live waiters other than us (stale markers from dead loops are cleared).
+_loop_session_others_waiting() {
+  local f pid
+  for f in "$_loop_session_base".wait.*; do
+    [ -e "$f" ] || continue
+    pid=${f##*.}
+    if [ "$pid" = "$$" ]; then continue; fi
+    if kill -0 "$pid" 2>/dev/null; then return 0; fi
+    rm -f "$f"
+  done
+  return 1
+}
+
+# Blocks until a session slot is free. $1 is the loop's stop file: returns 1 if it appears while
+# waiting. Callers define `log`.
+loop_session_acquire() {
+  local stop=$1 slot lock waited=0
+  command -v shlock >/dev/null 2>&1 || return 0
+  mkdir -p "$(dirname "$_loop_session_base")"
+  touch "$_loop_session_base.wait.$$"
+  while :; do
+    for ((slot = 1; slot <= LOOP_SESSION_SLOTS; slot++)); do
+      lock="$_loop_session_base.$slot"
+      if shlock -f "$lock" -p $$; then
+        LOOP_SESSION_LOCK=$lock
+        rm -f "$_loop_session_base.wait.$$"
+        return 0
+      fi
+    done
+    [ "$waited" -eq 0 ] && log "another loop's session is running — queuing for a session slot (LOOP_SESSION_SLOTS=$LOOP_SESSION_SLOTS)"
+    if [ -e "$stop" ]; then rm -f "$_loop_session_base.wait.$$"; return 1; fi
+    sleep 20; waited=$((waited + 20))
+  done
+}
+
+# Frees our slot; if another loop is queued, steps aside long enough for it to take the slot.
+loop_session_release() {
+  [ -n "$LOOP_SESSION_LOCK" ] || return 0
+  rm -f "$LOOP_SESSION_LOCK"
+  LOOP_SESSION_LOCK=""
+  if _loop_session_others_waiting; then sleep 30; fi
+}

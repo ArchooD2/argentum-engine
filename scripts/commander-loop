@@ -153,8 +153,10 @@ Triage format ($RUNS/commander-gaps.md), three sections:
    unlocks, the gate run, and that nothing was play-tested. Record the unit in the ledger.
 7. No PR open, '## Ready' has cards in the current deck or a later one -> card batch. \`git fetch\`, new worktree +
    'loop-cmdr-' branch from origin/main, regenerate the queue there. Take up to 15 '## Ready' cards in queue order
-   (the current deck first, most widely played first, then spill into the next decks). Fan them out to subagents
-   in chunks of 4-5 cards per subagent (at most four subagents; each reads the add-card skill and SDK reference once, then implements its cards one after another), with the add-card skill: each canonical in its earliest real printing's set, \`Printing\` rows in
+   (the current deck first, most widely played first, then spill into the next decks). Hand them to ONE subagent
+   (two, each with half, if more than eight cards) that reads the add-card skill and SDK reference once and
+   implements the cards one after another, writing files only — no git, no `just`, no builds; the single gate is
+   the only build. Use the add-card skill: each canonical in its earliest real printing's set, \`Printing\` rows in
    every scaffolded set that reprints it (\`scripts/generate-reprints.py --since origin/main\`), a scenario test only
    when add-card says the card earns one (one test file per card, never a shared one). A card that turns out to need
    new vocabulary is dropped from the batch and added to '## Gaps' as a new \`[ ]\` gap. Gate once with \`just loop-gate\`
@@ -251,6 +253,7 @@ while [ ! -e "$RUNS/commander.stop" ]; do
   PR=$LOOP_PRS
   [ -e "$RUNS/commander.stop" ] && break
 
+  loop_session_acquire "$RUNS/commander.stop" || break
   SESSION_START=$SECONDS
   TRANSCRIPT="$LOGDIR/$(date '+%Y%m%d-%H%M%S')-iter$N.jsonl"
   log "iteration $N (PR: ${PR:-none}) — transcript $TRANSCRIPT"
@@ -280,6 +283,7 @@ while [ ! -e "$RUNS/commander.stop" ]; do
   LAST=$(echo "$RESULT" | tail -1)
   STATS="$(( (SECONDS - SESSION_START) / 60 )) min, $STATS"
   log "iteration $N finished: ${LAST:-<no result>} ($STATS)"
+  loop_session_release
 
   # A session that ended on its protocol line finished its step; any "rate limit" in its text is
   # its own prose (e.g. a Scryfall 429 it reported), not the harness stopping it.

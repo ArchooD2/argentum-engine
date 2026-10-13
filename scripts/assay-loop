@@ -248,6 +248,7 @@ while [ ! -e "$RUNS/assay.stop" ]; do
   PR=$LOOP_PRS
   [ -e "$RUNS/assay.stop" ] && break
 
+  loop_session_acquire "$RUNS/assay.stop" || break
   SESSION_START=$SECONDS
   TRANSCRIPT="$LOGDIR/$(date '+%Y%m%d-%H%M%S')-iter$N.jsonl"
   log "iteration $N (PR: ${PR:-none}) — transcript $TRANSCRIPT"
@@ -277,6 +278,7 @@ while [ ! -e "$RUNS/assay.stop" ]; do
   LAST=$(echo "$RESULT" | tail -1)
   STATS="$(( (SECONDS - SESSION_START) / 60 )) min, $STATS"
   log "iteration $N finished: ${LAST:-<no result>} ($STATS)"
+  loop_session_release
 
   # A session that ended on its protocol line finished its step; any "rate limit" in its text is
   # its own prose (e.g. a Scryfall 429 it reported), not the harness stopping it.

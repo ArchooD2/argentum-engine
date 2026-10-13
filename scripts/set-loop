@@ -170,7 +170,7 @@ worktree (recreate it with \`git worktree add\` if missing). Never work in the m
    per card). Gate, commit, review, push, open a PR titled '[agent-loop: $MODEL] <capability> for <set name>' whose body
    names the gap, the cards it unlocks, the gate run, and that nothing was play-tested. Record the unit in the ledger.
 7. No PR open, sweep \`[x]\` or \`[!]\`, no buildable gap left -> card batch. \`git fetch\`, new worktree + 'loop-$CODE-' branch from origin/main. Take up
-   to 15 unimplemented cards from '## Ready', grouped by colour or theme. Fan them out to subagents, one card each,
+   to 15 unimplemented cards from '## Ready', grouped by colour or theme. Fan them out to subagents in chunks of 4-5 cards per subagent (at most four subagents; each reads the add-card skill and SDK reference once, then implements its cards one after another),
    with the add-card skill (one definition file and one scenario test file per card). A card that turns out to need
    new vocabulary is dropped from the batch and added to '## Gaps' as a new \`[ ]\` gap — the next iteration builds
    it before more cards. Gate once with \`just loop-gate\`, commit, review, push, open a PR titled

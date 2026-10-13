@@ -153,8 +153,8 @@ Triage format ($RUNS/commander-gaps.md), three sections:
    unlocks, the gate run, and that nothing was play-tested. Record the unit in the ledger.
 7. No PR open, '## Ready' has cards in the current deck or a later one -> card batch. \`git fetch\`, new worktree +
    'loop-cmdr-' branch from origin/main, regenerate the queue there. Take up to 15 '## Ready' cards in queue order
-   (the current deck first, most widely played first, then spill into the next decks). Fan them out to subagents,
-   one card each, with the add-card skill: each canonical in its earliest real printing's set, \`Printing\` rows in
+   (the current deck first, most widely played first, then spill into the next decks). Fan them out to subagents
+   in chunks of 4-5 cards per subagent (at most four subagents; each reads the add-card skill and SDK reference once, then implements its cards one after another), with the add-card skill: each canonical in its earliest real printing's set, \`Printing\` rows in
    every scaffolded set that reprints it (\`scripts/generate-reprints.py --since origin/main\`), a scenario test only
    when add-card says the card earns one (one test file per card, never a shared one). A card that turns out to need
    new vocabulary is dropped from the batch and added to '## Gaps' as a new \`[ ]\` gap. Gate once with \`just loop-gate\`

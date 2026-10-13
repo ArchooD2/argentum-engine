@@ -10,7 +10,8 @@ LOOP_PR_PROTOCOL="PR LIFECYCLE — every PR is reviewed BEFORE it is opened, so 
   printing checks, assay gates). Never run \`just build\` or \`just test\`: loop-gate runs the tests your diff can
   break and CI runs the full suite on the PR — running the full suite twice is the waste this rule exists to stop.
 - Then review the branch (\`origin/main...HEAD\`) with the review-changes skill in SPLIT MODE: you wrote the code, so
-  you only dispatch — one TRIAGE subagent, one subagent per area it names, one WEIGH subagent — each a fresh context,
+  you only dispatch — one TRIAGE subagent, then (unless it reviewed a single-area diff itself in a single pass) one
+  subagent per area it names (at most three) and one WEIGH subagent — each a fresh context,
   with the review dir \`<worktree>/.claude/loop-runs/review-<branch>/\`. Tell each that \`just loop-gate\` already
   passed on this head (CI runs the full suite), so nobody re-runs tests. WEIGH returns the verdict and writes the
   findings to the review dir instead of posting them. Fix the findings it calls blocking or important; you may decline

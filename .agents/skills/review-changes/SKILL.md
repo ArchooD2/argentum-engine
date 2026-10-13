@@ -124,6 +124,18 @@ to you, the review still happens per area:
 - **Driven by an orchestrator (split mode).** The caller asks for one phase at a time and
   dispatches the area reviewers itself. Everything goes through a scratch directory the
   caller names (`<review-dir>`, gitignored — e.g. `<worktree>/.claude/loop-runs/review-pr-<N>/`):
+  - **Keep the fan-out small.** Every phase is a fresh context that re-reads the diff, so
+    each extra agent costs a full read. Split mode spawns at most **three** area reviewers:
+    fold an area with under ~100 changed lines into its nearest neighbour (or into
+    WEIGH's own cross-area check), and split an area into sub-areas only past ~3000
+    changed lines, not the ~1500 of §2.
+  - **Single pass** — when TRIAGE finds one area (typically Cards & tests only: card
+    definitions, their tests, backlog and goldens, no new SDK vocabulary) under ~1500
+    changed lines, it does the review itself instead of writing briefs: that area's §3
+    brief, then §4, with the findings written to `<review-dir>/review.md` (posted as a PR
+    comment if the caller asked for one). It returns `AREAS: none (single pass)` plus the
+    WEIGH return fields, and the caller skips AREA and WEIGH. The "Reviewed by" line says
+    "single pass".
   - **TRIAGE** — do §1 and §2 as written, but instead of spawning, write one brief per
     reviewer to `<review-dir>/<area>.brief.md` (areas and sub-areas named as in §2, e.g.
     `engine-combat`). Each brief is the full prompt from §3: workspace, base, owned files,

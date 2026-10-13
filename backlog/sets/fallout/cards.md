@@ -2,10 +2,10 @@
 
 **Set Size:** 336 cards
 **Release Date:** March 8, 2024
-**Implemented:** 156 / 336
+**Implemented:** 157 / 336
 | Section    | Total | Done |
 |------------|-------|------|
-| Extras     | 336   | 129  |
+| Extras     | 336   | 157  |
 
 > Verify status anytime with `scripts/card-status --set PIP` (and `--list`). That command's count is authoritative — keep this file's `Implemented:` line in sync (`just fix-backlog`) as boxes are checked. The set's mechanics are catalogued in [`mechanics.md`](mechanics.md).
 
@@ -243,7 +243,7 @@
 - [ ] Scavenger Grounds
 - [ ] Screeching Scorchbeast
 - [x] Secure the Wastes
-- [ ] Securitron Squadron
+- [x] Securitron Squadron
 - [ ] Sentinel Sarah Lyons
 - [ ] Sentry Bot
 - [x] Shadowblood Ridge

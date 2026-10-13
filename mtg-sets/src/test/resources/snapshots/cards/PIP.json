@@ -2352,6 +2352,99 @@
     }
 }
 
+// Securitron Squadron
+{
+    "name": "Securitron Squadron",
+    "manaCost": "{1}{W}",
+    "typeLine": "Artifact Creature — Robot",
+    "oracleText": "Squad {3} (As an additional cost to cast this spell, you may pay {3} any number of times. When this creature enters, create that many tokens that are copies of it.)\nVigilance\nWhenever a creature token you control enters, put a +1/+1 counter on it.",
+    "creatureStats": {
+        "power": 2,
+        "toughness": 2
+    },
+    "keywords": [
+        "VIGILANCE",
+        "SQUAD"
+    ],
+    "keywordAbilities": [
+        {
+            "type": "Kicker",
+            "manaCost": "{3}",
+            "multi": true,
+            "displayPrefix": "Squad",
+            "keyword": "SQUAD",
+            "declaredSlot": "SQUAD"
+        }
+    ],
+    "script": {
+        "triggeredAbilities": [
+            {
+                "id": "Securitron Squadron:1",
+                "trigger": {
+                    "type": "ZoneChangeEvent",
+                    "to": "Battlefield"
+                },
+                "effect": {
+                    "type": "CreateTokenCopyOfTarget",
+                    "target": "TriggeringEntity",
+                    "count": {
+                        "type": "CastChoice",
+                        "slot": "SQUAD"
+                    }
+                },
+                "interveningIf": {
+                    "type": "CastChoiceMade",
+                    "slot": "SQUAD"
+                }
+            },
+            {
+                "id": "Securitron Squadron:2",
+                "trigger": {
+                    "type": "ZoneChangeEvent",
+                    "filter": "creature token ctrl:you",
+                    "to": "Battlefield"
+                },
+                "binding": "ANY",
+                "effect": {
+                    "type": "AddCounters",
+                    "counterType": "PLUS_ONE_PLUS_ONE",
+                    "count": 1,
+                    "target": "TriggeringEntity"
+                },
+                "descriptionOverride": "Whenever a creature token you control enters, put a +1/+1 counter on it."
+            }
+        ]
+    },
+    "metadata": {
+        "collectorNumber": "23",
+        "rarity": "RARE",
+        "artist": "Jonas De Ro",
+        "imageUri": "https://cards.scryfall.io/normal/front/b/6/b689a206-aec3-4a31-95cf-3d4b840db04c.jpg?1783912416",
+        "rulings": [
+            {
+                "date": "2024-03-08",
+                "text": "You may pay the squad cost any number of times. You will create a token that is a copy of that permanent for each time you paid the squad cost. If you paid the squad cost multiple times, the tokens will all enter the battlefield simultaneously."
+            },
+            {
+                "date": "2024-03-08",
+                "text": "If Securitron Squadron enters the battlefield at the same time as one or more creature tokens, its last ability will trigger for each of those creature tokens. If that Securitron Squadron is itself a creature token, its last ability will trigger when it enters the battlefield as well."
+            },
+            {
+                "date": "2024-03-08",
+                "text": "For example, if you pay Securitron Squadron's squad cost three times, then you'll create three token copies of Securitron Squadron when its squad ability resolves. Each of those tokens will enter the battlefield simultaneously. When they enter, their last abilities will each trigger three times (once for each of the other two tokens, and once for itself.) If the original Securitron Squadron is still on the battlefield, its last ability will trigger three times as well. After all of the triggered abilities resolve, each of the three token copies of Securitron Squadron will have four +1/+1 counters on it."
+            },
+            {
+                "date": "2024-03-08",
+                "text": "If the spell resolves but the creature with squad leaves the battlefield before its squad ability resolves, you'll still create the token copies."
+            },
+            {
+                "date": "2024-03-08",
+                "text": "If the spell is countered, the squad ability will not trigger, and no tokens will be created."
+            }
+        ]
+    }
+}
+
 // Sierra, Nuka's Biggest Fan
 {
     "name": "Sierra, Nuka's Biggest Fan",

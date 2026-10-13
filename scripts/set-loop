@@ -274,13 +274,20 @@ model ID from your session's system information and use it instead of '$MODEL' i
 answer STUCK cannot determine driving model ID."
 fi
 
+# One loop per set: a second one shares the worktree and the run log, and clobbers both.
+if [ -f "$RUNS/$CODE.pid" ] && kill -0 "$(cat "$RUNS/$CODE.pid")" 2>/dev/null; then
+  echo "set-loop $CODE is already running (pid $(cat "$RUNS/$CODE.pid")); stop it first." >&2
+  exit 1
+fi
+
 # Everything the loop prints also goes to the run log.
 LOGDIR="$RUNS/$CODE-logs"
 mkdir -p "$LOGDIR"
 exec > >(tee -a "$RUNS/$CODE.log") 2>&1
 # `just loops` reads this to tell a running loop from a finished one.
 echo $$ > "$RUNS/$CODE.pid"
-trap 'rm -f "$RUNS/$CODE.pid"' EXIT
+# Only remove the pid file if it is still ours.
+trap '[ "$(cat "$RUNS/$CODE.pid" 2>/dev/null)" = "$$" ] && rm -f "$RUNS/$CODE.pid"' EXIT
 log() { echo "[$(date '+%F %T')] $*"; }
 
 # Streamed live: the milestones the session reports (Working on / Finding / Summary), nothing else.

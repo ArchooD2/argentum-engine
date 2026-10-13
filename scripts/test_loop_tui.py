@@ -3,6 +3,9 @@ import importlib.machinery
 import importlib.util
 from pathlib import Path
 import unittest
+from datetime import datetime
+from types import SimpleNamespace
+import tempfile
 
 _loader = importlib.machinery.SourceFileLoader("loop_tui", str(Path(__file__).with_name("loop-tui")))
 _spec = importlib.util.spec_from_loader("loop_tui", _loader)
@@ -11,6 +14,34 @@ _loader.exec_module(loop_tui)
 
 
 class LoopTuiTest(unittest.TestCase):
+    def test_stamped_stream_lines_preserve_session_state_and_old_milestones(self):
+        with tempfile.TemporaryDirectory() as root:
+            log = Path(root) / "pip.log"
+            log.write_text(
+                "[2026-10-12 23:58:00] set-loop pip started (harness codex, model test)\n"
+                "[2026-10-12 23:59:00] iteration 1 (PR: none)\n"
+                "   🔨 Working on: legacy message\n"
+                "[2026-10-13 00:00:01]    🔎 Finding: stamped message\n"
+                "[2026-10-13 00:00:02]    → command\n"
+                "[2026-10-13 00:00:03]    💬 other message\n"
+                "[2026-10-13 00:00:04]    ! error\n"
+                "[2026-10-13 00:01:00]    📋 Summary: done\n"
+                "[2026-10-13 00:02:00] iteration 1 finished: STEP 1 DONE (3 min)\n"
+            )
+            events, milestones = loop_tui.status.parse(log)
+        self.assertEqual(len(events), 3)
+        self.assertEqual(milestones, [(1, "🔨", "Working on: legacy message"),
+                                      (1, "🔎", "Finding: stamped message"),
+                                      (1, "📋", "Summary: done")])
+
+    def test_history_shows_completion_date_seconds_and_duration_across_midnight(self):
+        ui = SimpleNamespace(GREEN=1, YELLOW=2, RED=3)
+        events = [(datetime(2026, 10, 12, 23, 59), "iteration 1 (PR: none)"),
+                  (datetime(2026, 10, 13, 0, 2, 5), "iteration 1 finished: STEP 1 DONE (3 min)")]
+        row = loop_tui.Screen.history(ui, events)[0]
+        self.assertTrue(row[0].startswith("2026-10-13 00:02:05  STEP 1 DONE"))
+        self.assertEqual(row[2], loop_tui.human(185))
+
     def test_ci_state(self):
         self.assertEqual(loop_tui.ci_state([]), "waiting for checks")
         self.assertEqual(loop_tui.ci_state([{"conclusion": "SUCCESS"}, {"conclusion": "SKIPPED"}]), "green")

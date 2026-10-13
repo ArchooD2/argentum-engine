@@ -515,7 +515,7 @@ class Screen:
                 colour = self.GREEN if "DONE" in result or "COMPLETE" in result else \
                     self.YELLOW if "WAITING" in result else self.RED
                 took = human((ts - began).total_seconds())
-                rows.append((f"{began:%H:%M}  {result}", 0, took, colour))
+                rows.append((f"{ts:%Y-%m-%d %H:%M:%S}  {result}", 0, took, colour))
         return rows[::-1]
 
     def last_summary(self, events, milestones):

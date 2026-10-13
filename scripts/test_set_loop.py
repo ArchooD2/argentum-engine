@@ -103,6 +103,7 @@ echo '{"type":"result","result":"SET_COMPLETE","num_turns":1,"duration_ms":1000}
                 self.assertIn("--approve-for-me", args)
                 self.assertIn("[agent-loop: gpt-6-astra]", "\n".join(args))
                 self.assertIn("Summary: checked", result.stdout)
+                self.assertRegex(result.stdout, r"\[\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\]    📋 Summary: checked")
                 self.assertIn("set ecl complete", result.stdout)
 
     def test_environment_model_and_positional_override(self):
@@ -151,6 +152,16 @@ echo '{"type":"result","result":"SET_COMPLETE","num_turns":1,"duration_ms":1000}
         result = self.run_loop()
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("harness claude, model claude-opus-5-5", result.stdout)
+
+    def test_claude_milestones_are_timestamped(self):
+        self.stub("claude", """
+echo '{"type":"assistant","message":{"content":[{"type":"text","text":"Working on: proof\\nSummary: checked"}]}}'
+echo '{"type":"result","result":"SET_COMPLETE"}'
+""")
+        result = self.run_loop("sonnet")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        for icon, text in (("🔨", "Working on: proof"), ("📋", "Summary: checked")):
+            self.assertRegex(result.stdout, rf"\[\d{{4}}-\d\d-\d\d \d\d:\d\d:\d\d\]    {icon} {text}")
 
     def test_priority_deck_is_carried_into_fresh_sessions(self):
         priority = self.root / "deck list.txt"

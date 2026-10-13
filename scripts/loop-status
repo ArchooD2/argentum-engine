@@ -80,7 +80,13 @@ def parse(log):
     events, milestones = [], []  # milestones: (index of the event they follow, icon, text)
     for line in lines[start:]:
         if m := STAMP.match(line):
-            events.append((datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S"), m.group(2)))
+            # Streamed milestones now have timestamps too. Keep them attached to the session
+            # event rather than changing the loop's running/waiting/finished state.
+            if milestone := MILESTONE.match(m.group(2)):
+                if events:
+                    milestones.append((len(events) - 1, milestone.group(1), milestone.group(2)))
+            elif not m.group(2).startswith("   "):
+                events.append((datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S"), m.group(2)))
         elif (m := MILESTONE.match(line)) and events:
             milestones.append((len(events) - 1, m.group(1), m.group(2)))
     return events, milestones

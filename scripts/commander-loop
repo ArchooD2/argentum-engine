@@ -246,6 +246,9 @@ if [ "$HARNESS" = codex ]; then
     else empty end'
 fi
 
+# Stamp each rendered line when received, using the same local clock as launcher events.
+PRETTY="($PRETTY)"' | "[" + (now | strflocaltime("%Y-%m-%d %H:%M:%S")) + "] " + .'
+
 log "commander-loop started (top $TOP, harness $HARNESS, model $MODEL, log $RUNS/commander.log)"
 N=0
 while [ ! -e "$RUNS/commander.stop" ]; do

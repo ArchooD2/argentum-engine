@@ -34,7 +34,10 @@ approval review in the workspace sandbox); Claude uses `PERMISSION_MODE`, defaul
 Both share the ledger and logs under `.claude/loop-runs/`, so run only one launcher per set at a time.
 Started from a terminal, the launcher opens a live dashboard (`scripts/loop-tui`): what the running
 session is doing, the loop's open PRs and their CI, the set's progress, every finished session with
-its duration, and the last summary. Press **s** to stop after the current job (again to cancel),
+its completion timestamp and duration, and the last summary. Log lines, including streamed
+milestones and verbose tool calls, show local dates and times to the second. Older logs remain
+readable; timestamps for previously unstamped messages cannot be recovered.
+Press **s** to stop after the current job (again to cancel),
 **q** twice to stop now, **l** for the raw log. `just loop-watch ecl` opens the same dashboard on a
 loop that is already running; `LOOP_TUI=0` keeps the plain streamed output. Without the dashboard,
 `touch .claude/loop-runs/ecl.stop` also stops after the current job, including while waiting on CI.

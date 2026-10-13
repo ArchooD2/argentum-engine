@@ -251,6 +251,7 @@ while [ ! -e "$RUNS/commander.stop" ]; do
   PR=$LOOP_PRS
   [ -e "$RUNS/commander.stop" ] && break
 
+  SESSION_START=$SECONDS
   TRANSCRIPT="$LOGDIR/$(date '+%Y%m%d-%H%M%S')-iter$N.jsonl"
   log "iteration $N (PR: ${PR:-none}) — transcript $TRANSCRIPT"
   if [ "$HARNESS" = codex ]; then
@@ -272,9 +273,12 @@ while [ ! -e "$RUNS/commander.stop" ]; do
     FINAL=$(jq -Rc 'fromjson? | select(.type == "result")' "$TRANSCRIPT" 2>/dev/null | tail -1)
     RESULT=$(echo "$FINAL" | jq -r '.result // empty' 2>/dev/null)
 
-    STATS=$(echo "$FINAL" | jq -r '"\(.num_turns // "?") turns, \((.duration_ms // 0) / 60000 | floor) min"' 2>/dev/null)
+    # A session reports a result each time it wakes for a background task, so the last one's
+    # duration is only its tail: time the session by the wall clock instead.
+    STATS=$(echo "$FINAL" | jq -r '"$\(.total_cost_usd // 0 | . * 100 | round / 100) at API prices"' 2>/dev/null)
   fi
   LAST=$(echo "$RESULT" | tail -1)
+  STATS="$(( (SECONDS - SESSION_START) / 60 )) min, $STATS"
   log "iteration $N finished: ${LAST:-<no result>} ($STATS)"
 
   # A session that ended on its protocol line finished its step; any "rate limit" in its text is

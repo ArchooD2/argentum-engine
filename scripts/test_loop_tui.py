@@ -22,6 +22,20 @@ class LoopTuiTest(unittest.TestCase):
         self.assertEqual(loop_tui.clip("abcdef", 4), "abc…")
         self.assertEqual(loop_tui.width("📋a"), 3)
 
+    def test_window_labels(self):
+        self.assertEqual(loop_tui.window_label(300), "5h")
+        self.assertEqual(loop_tui.window_label(10080), "7d")
+        self.assertEqual(loop_tui.window_label(45), "45m")
+
+    def test_last_json_reads_the_newest_matching_line(self):
+        import tempfile
+        with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as f:
+            f.write('{"type":"rate_limit_event","n":1}\n' + '{"type":"x"}\n' * 20000
+                    + '{"type":"rate_limit_event","n":2}\n{"type":"y"}\n')
+        self.assertEqual(loop_tui.last_json(Path(f.name), '"rate_limit_event"')["n"], 2)
+        self.assertIsNone(loop_tui.last_json(Path(f.name), '"nope"'))
+        Path(f.name).unlink()
+
     def test_watching_a_loop_without_a_log_fails_cleanly(self):
         self.assertEqual(loop_tui.main(["--name", "no-such-loop-zz"]), 1)
 

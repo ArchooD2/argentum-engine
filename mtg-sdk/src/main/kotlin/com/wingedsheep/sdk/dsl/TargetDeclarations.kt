@@ -94,6 +94,7 @@ interface TargetDeclarations {
         exactly: DynamicAmount? = null,
         sameController: Boolean = false,
         sameOwner: Boolean = false,
+        ownerDistribution: com.wingedsheep.sdk.scripting.targets.OwnerDistribution? = null,
         sameNumericProperty: com.wingedsheep.sdk.scripting.values.CardNumericProperty? = null,
         sameCreatureType: Boolean = false,
         sameCardType: Boolean = false,
@@ -103,6 +104,10 @@ interface TargetDeclarations {
         onePerCardType: Boolean = false,
         chooser: TargetChooser = TargetChooser.Controller,
     ): List<EffectTarget.BoundVariable> {
+        require(ownerDistribution == null ||
+            (count == 1 && minCount == 1 && !optional && !unlimited && dynamicMaxCount == null && exactly == null)) {
+            "ownerDistribution is the whole target count; use UP_TO_ONE for optional per-owner targets"
+        }
         require(exactly == null || (dynamicMaxCount == null && !optional && !unlimited)) {
             "targets(exactly = …) is the whole count; don't combine it with dynamicMaxCount, optional or unlimited"
         }
@@ -117,6 +122,7 @@ interface TargetDeclarations {
                 dynamicMinCount = exactly,
                 sameController = sameController,
                 sameOwner = sameOwner,
+                ownerDistribution = ownerDistribution,
                 sameNumericProperty = sameNumericProperty,
                 sameCreatureType = sameCreatureType,
                 sameCardType = sameCardType,

@@ -1,6 +1,6 @@
 package com.wingedsheep.engine.handlers.actions.spell
 
-import com.wingedsheep.engine.mechanics.targeting.withNumericEquality
+import com.wingedsheep.engine.mechanics.targeting.withTargetConstraints
 import com.wingedsheep.engine.handlers.TargetFinder
 import com.wingedsheep.engine.handlers.TargetingSourceType
 import com.wingedsheep.engine.handlers.effects.ZoneTransitionService
@@ -393,7 +393,8 @@ class CastSpellHandler(
         // every requirement to zero. A choose-N modal cast may announce them per mode only, and the
         // validator binds each slice against its own mode. Fixed-size groups bind one way only.
         val unbound = spellTargeting(state, action, cardDef, transformedFace)
-        val announced = action.targets.isNotEmpty() || action.modeTargetsOrdered.any { it.isNotEmpty() }
+        val announced = action.targets.isNotEmpty() || action.modeTargetsOrdered.any { it.isNotEmpty() } ||
+            unbound.requirements.any { DynamicTargetCount.objectOf(it)?.ownerDistribution != null }
         val targeting = if (!announced || TargetValidator.hasFixedGroups(unbound.requirements)) unbound
             else unbound.boundTo(castValidator.targetBinding(state, action, cardDef, transformedFace)
                 ?.takeIf { it.error == null }?.counts)
@@ -551,7 +552,8 @@ class CastSpellHandler(
          * Everything after the cast walks the flat target list by `count` — named targets, the 608.2b
          * re-check, splice slices, mode slices, copies — so a partly filled "up to N" group must
          * record what it holds, or every later group would read the wrong slots. A mode chosen more
-         * than once keeps its printed requirements: [perMode] can hold only one binding per mode.
+         * than once keeps its printed requirements in [perMode], which cannot hold distinct
+         * occurrences; resolution slices the bound flat requirements for each occurrence instead.
          */
         fun boundTo(counts: List<Int>?): SpellTargeting {
             if (counts == null || counts.size != requirements.size) return this
@@ -1191,7 +1193,13 @@ class CastSpellHandler(
         xValue: Int?
     ): DynamicTargetCount.Bounds {
         val unboundedFallback = if (requirement.unlimited) Int.MAX_VALUE else requirement.count
-        val bounds = DynamicTargetCount.bounds(requirement, xValue) { amount ->
+        val distributed = if (DynamicTargetCount.objectOf(requirement)?.ownerDistribution != null) {
+            com.wingedsheep.engine.mechanics.targeting.OwnerTargetDistribution.bounds(state, requirement,
+                targetFinder.findLegalTargets(state, requirement, casterId, cardId,
+                    targetingSourceType = TargetingSourceType.SPELL,
+                    pipelineContext = PredicateContext(controllerId = casterId, sourceId = cardId, xValue = xValue)))
+        } else null
+        val bounds = distributed ?: DynamicTargetCount.bounds(requirement, xValue) { amount ->
             conditionEvaluator.amounts.evaluate(
                 state, amount, EffectContext(sourceId = cardId, controllerId = casterId, xValue = xValue)
             )
@@ -1273,7 +1281,7 @@ class CastSpellHandler(
                     mustDifferFromEarlier = req is com.wingedsheep.sdk.scripting.targets.TargetOther,
                     minTargets = counts.min,
                     maxTargets = maxTargets
-                ).withNumericEquality(state, req, legalTargetsMap[index].orEmpty())
+                ).withTargetConstraints(state, req, legalTargetsMap[index].orEmpty())
             }
 
             if (requirementInfos.any { it.minTargets > it.maxTargets }) {

@@ -1,6 +1,6 @@
 package com.wingedsheep.engine.handlers.actions.ability
 
-import com.wingedsheep.engine.mechanics.targeting.withNumericEquality
+import com.wingedsheep.engine.mechanics.targeting.withTargetConstraints
 
 import com.wingedsheep.engine.core.*
 import com.wingedsheep.engine.handlers.ConditionEvaluator
@@ -38,7 +38,10 @@ internal class ActivationModalChoices(
 
     private fun counts(state: GameState, action: ActivateAbility, req: TargetRequirement): DynamicTargetCount.Bounds {
         val ctx = EffectContext(sourceId = action.sourceId, controllerId = action.playerId, xValue = action.xValue)
-        val bounds = DynamicTargetCount.bounds(req, action.xValue) { conditions.amounts.evaluate(state, it, ctx) }
+        val distributed = if (DynamicTargetCount.objectOf(req)?.ownerDistribution != null) {
+            com.wingedsheep.engine.mechanics.targeting.OwnerTargetDistribution.bounds(state, req, legal(state, action, req))
+        } else null
+        val bounds = distributed ?: DynamicTargetCount.bounds(req, action.xValue) { conditions.amounts.evaluate(state, it, ctx) }
         return bounds.copy(max = bounds.max ?: if (req.unlimited) Int.MAX_VALUE else req.count)
     }
 
@@ -147,7 +150,7 @@ internal class ActivationModalChoices(
                 val bounds = counts(state, action, req)
                 TargetRequirementInfo(index = index, description = req.description,
                     minTargets = bounds.min, maxTargets = bounds.max!!.coerceAtMost(maxOf(legal.getValue(index).size, bounds.min)))
-                    .withNumericEquality(state, req, legal.getValue(index))
+                    .withTargetConstraints(state, req, legal.getValue(index))
             }
             if (infos.any { it.minTargets > it.maxTargets }) return ExecutionResult.error(state, "No compatible targets for mode")
             val name = state.getEntity(action.sourceId)?.get<CardComponent>()?.name

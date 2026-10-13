@@ -17,6 +17,7 @@ import com.wingedsheep.engine.core.ChooseNumberDecision
 import com.wingedsheep.engine.core.ChooseOptionDecision
 import com.wingedsheep.engine.core.ChooseReplacementDecision
 import com.wingedsheep.engine.core.ChooseTargetsDecision
+import com.wingedsheep.engine.core.constrainedTargetSelection
 import com.wingedsheep.engine.core.legalTargetsFor
 import com.wingedsheep.engine.core.ColorChosenResponse
 import com.wingedsheep.engine.core.CombatResolutionDecision
@@ -83,7 +84,12 @@ class FastDecisionResponder(private val intents: IntentCatalog = IntentCatalog.N
                 decision.id,
                 decision.targetRequirements.fold(emptyMap()) { chosen, req ->
                     val pool = decision.legalTargetsFor(req.index, chosen)
-                    val legal = req.selectionGroups?.map { group -> group.filter { it in pool } }
+                    val ownerPicks = req.exclusiveGroups?.let { groups ->
+                        constrainedTargetSelection(pool, req.minTargets, req.maxTargets, req.selectionGroups, groups) {
+                            TargetSelection.rank(state, it, playerId, intents)
+                        }
+                    }
+                    val legal = ownerPicks ?: req.selectionGroups?.map { group -> group.filter { it in pool } }
                         ?.filter { it.size >= req.minTargets }
                         ?.maxByOrNull { group -> group.sortedByDescending { TargetSelection.rank(state, it, playerId, intents) }
                             .take(req.maxTargets).sumOf { TargetSelection.rank(state, it, playerId, intents) } }

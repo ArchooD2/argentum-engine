@@ -354,20 +354,22 @@ class TargetEnumerationUtils(
         return targetReqs.mapIndexed { index, req ->
             // A board-state count ("X target creatures, where X is …") is knowable now; an X from
             // the cost is not, and stays at the static bounds until the player announces it.
-            val bounds = DynamicTargetCount.bounds(req, xValue = null) { amount ->
+            val candidates = findValidTargets(state, playerId, req, sourceId, targetingSourceType)
+            val bounds = com.wingedsheep.engine.mechanics.targeting.OwnerTargetDistribution.bounds(state, req, candidates)
+                ?: DynamicTargetCount.bounds(req, xValue = null) { amount ->
                 predicateEvaluator.amounts.evaluate(state, amount, EffectContext(sourceId = sourceId, controllerId = playerId))
             }
-            val validTargets = findValidTargets(state, playerId, req, sourceId, targetingSourceType)
+            val validTargets = candidates
                 .takeIf { satisfiesControllerSpread(state, req, it) }
                 // Too few distinct legal objects for the required count leaves no legal choice
                 // (CR 601.2c, 115.3), so the requirement reports none and the action isn't offered.
                 ?.takeIf { it.size >= bounds.min }
                 ?: emptyList()
-            val equalityGroups = (req as? TargetObject)?.sameNumericProperty?.let {
-                com.wingedsheep.engine.mechanics.targeting.NumericTargetEquality.groups(state, validTargets, it)
-                    .filter { group -> group.size >= bounds.min }
-            }
+            val equalityGroups = com.wingedsheep.engine.mechanics.targeting.NumericTargetEquality
+                .compatibleGroups(state, validTargets, req, bounds.min)
             TargetInfo(
+                exclusiveGroups = if ((req as? TargetObject)?.ownerDistribution != null)
+                    com.wingedsheep.engine.mechanics.targeting.OwnerTargetDistribution.groups(state, validTargets) else null,
                 selectionGroups = equalityGroups,
                 index = index,
                 description = req.description,
@@ -384,6 +386,7 @@ class TargetEnumerationUtils(
                 // the cap the player could pick a ninth target and then be unable to produce a
                 // legal division.
                 maxTargets = when {
+                    (req as? TargetObject)?.ownerDistribution != null -> bounds.max ?: 0
                     req.unlimited -> minOf(validTargets.size, bounds.max ?: validTargets.size)
                     else -> bounds.max ?: req.count
                 },

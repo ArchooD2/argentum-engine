@@ -186,7 +186,7 @@
 - [x] Mr. House, President and CEO
 - [ ] Mutational Advantage
 - [x] Myriad Landscape
-- [ ] Mysterious Stranger
+- [x] Mysterious Stranger
 - [ ] Mystic Forge
 - [x] Mystic Monastery
 - [ ] Nerd Rage

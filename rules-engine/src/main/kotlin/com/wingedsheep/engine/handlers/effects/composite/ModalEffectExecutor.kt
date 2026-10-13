@@ -178,7 +178,7 @@ class ModalEffectExecutor(
             modeTargetsOrdered = context.modeTargetsOrdered,
             modeTargetRequirements = context.modeTargetRequirements
         )
-        if (context.activatedAbility != null) {
+        if (context.modeTargetsOrdered.isNotEmpty()) {
             val sizes = context.modeTargetsOrdered.map { it.size }
             val start = context.alignedTargets.size - sizes.sum()
             var offset = start
@@ -348,6 +348,7 @@ internal fun processPreTargetedEffectQueue(
         // A bare `PipelineState(namedTargets = …)` here dropped every stored collection, number
         // and chosen value the resolution had accumulated before the modal.
         pipeline = ctx.pipeline.copy(
+            declaredTargetNames = ctx.pipeline.declaredTargetNames + head.targetRequirements.mapNotNull { it.id },
             namedTargets = ctx.pipeline.namedTargets.filterKeys { key ->
                 head.targetRequirements.none { req -> req.id?.let { key == it || key.startsWith("$it[") } == true }
             } +
@@ -385,11 +386,9 @@ internal fun processPreTargetedEffectQueue(
     if (result.outcome is Outcome.Paused) {
         return EffectResult.propagatePause(result.state, nextEvents)
     }
-    if (result.outcome is Outcome.Rejected) {
-        return EffectResult(state = result.state, events = nextEvents, outcome = result.outcome)
-    }
-
-    // Success — pop the pre-pushed tail continuation and drain the rest synchronously.
+    // An unavailable target can reject a single instruction. As in CompositeEffectExecutor,
+    // continue with later instructions rather than abandoning the remaining chosen modes.
+    // Pop the pre-pushed tail continuation and drain the rest synchronously.
     val nextState = if (tail.isNotEmpty()) {
         val (_, afterPop) = result.state.popContinuation()
         afterPop

@@ -233,6 +233,9 @@ object ArenaAgents {
         // attack, blocks priced by the walker they save.
         ArenaAgent("production-walkerdefence", AiProfile.PRODUCTION_WALKERDEFENCE),
         ArenaAgent("production-candidate-walkerdefence", AiProfile.PRODUCTION_CANDIDATE_WALKERDEFENCE),
+        // A precombat pump priced by the attack it buys, when it changes who attacks.
+        ArenaAgent("production-planpumps", AiProfile.PRODUCTION_PLANPUMPS),
+        ArenaAgent("production-candidate-planpumps", AiProfile.PRODUCTION_CANDIDATE_PLANPUMPS),
         // Instant-speed deploys held for the opponent's turn: flash bodies judged by what they do on
         // arrival, token and walker instants given the same hold.
         ArenaAgent("production-deployhold", AiProfile.PRODUCTION_DEPLOYHOLD),

@@ -3195,11 +3195,15 @@ object DamageUtils {
                 // re-read.
                 if (effect.damagedPlayerMills && targetId in state.turnOrder) {
                     val millCount = KeywordActionAmountModifier.mill(newState, targetId, amount, predicateEvaluator = zones.predicateEvaluator)
-                    for (cardId in newState.getLibrary(targetId).take(millCount)) {
+                    val milledCards = newState.getLibrary(targetId).take(millCount)
+                    for (cardId in milledCards) {
                         val result = zones.moveToZone(newState, cardId, Zone.GRAVEYARD)
                         newState = result.state
                         events.addAll(result.events)
                     }
+                    val (trackedState, milledEvent) = ZoneTransitionService.trackMill(newState, events, milledCards)
+                    newState = trackedState
+                    milledEvent?.let(events::add)
                 }
 
                 return EffectResult.success(newState, events)
@@ -3262,15 +3266,19 @@ object DamageUtils {
                 // the top cards before moving so a shrinking library doesn't re-read shifted slots.
                 var newState = state
                 val events = mutableListOf<EngineGameEvent>()
+                val milledCards = mutableListOf<EntityId>()
                 for (opponentId in state.getOpponents(sourceControllerId)) {
                     val topCards = newState.getLibrary(opponentId).take(amount)
+                    milledCards += topCards
                     for (cardId in topCards) {
                         val result = zones.moveToZone(newState, cardId, Zone.GRAVEYARD)
                         newState = result.state
                         events.addAll(result.events)
                     }
                 }
-                return EffectResult.success(newState, events)
+                // One mill instruction for every opponent (CR 603.2c: a single milled event).
+                val (trackedState, milledEvent) = ZoneTransitionService.trackMill(newState, events, milledCards)
+                return EffectResult.success(trackedState, events + listOfNotNull(milledEvent))
             }
         }
 

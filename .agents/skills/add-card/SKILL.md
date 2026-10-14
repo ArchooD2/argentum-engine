@@ -242,12 +242,12 @@ UX failures to catch:
 If the existing components don't serve the card well, prefer extending one over creating a new one — but
 build what's genuinely needed.
 
-## Step 7: E2E test
+## Step 7: No E2E tests
 
-**Only if Step 6 introduced a new visual or UX mechanic.**
-
-`e2e-scenarios/tests/{set}/{card-name}.spec.ts`, using the `createGame` fixture and `GamePage` helpers.
-Give both players at least one library card so nobody loses to an empty draw.
+**Never write or run Playwright/E2E tests from this skill** — no `e2e-scenarios/` specs, no
+`just e2e-test`, no `just e2e-loop`, even when Step 6 touched the UI. Cover the card with scenario tests
+and `cd web-client && npm run typecheck` for client changes. E2E runs take too long; if a UI flow needs
+checking, test it manually in the running app instead.
 
 ## Step 8: Trace new engine mechanics
 

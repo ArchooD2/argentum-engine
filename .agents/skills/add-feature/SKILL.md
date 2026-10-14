@@ -195,6 +195,11 @@ SDK and client tests are supporting layers; don't let them substitute for engine
 details (`ScenarioTestBase` vs `GameTestDriver`, inline test cards) and which command to run: the
 **`verify`** skill.
 
+**Never write or run Playwright/E2E tests from this skill** — no `e2e-scenarios/` specs, no
+`just e2e-test`, no `just e2e-loop`, even for UI work. Client changes are covered by
+`cd web-client && npm run typecheck` plus the engine/server tests above. E2E runs take too long; if a UI
+flow needs checking, test it manually in the running app instead.
+
 ## Step 8: Update the docs in the same change
 
 - **[`docs/card-sdk-language-reference.md`](../../../docs/card-sdk-language-reference.md)** — every new

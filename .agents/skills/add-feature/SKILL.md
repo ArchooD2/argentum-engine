@@ -154,6 +154,13 @@ every AI/MCTS node. **Cheap-looking work in a primitive multiplies.**
 The client is a dumb terminal (`architecture-principles.md` §4) — it renders what the server sends and
 captures intent. **Server-side feature design *is* the UX.**
 
+**Good UI/UX is a requirement, not a nice-to-have.** Players judge the game by how it feels to play, so
+a mechanic that works but is confusing, cluttered, ugly or clumsy to use is not done. The bar: a player
+who knows Magic but has never seen this feature understands what is being asked and acts without
+hesitation — clear wording, the obvious place to click, the right board context visible, consistent with
+how similar interactions already look, and visually polished. When the existing flow falls short, fix it
+in the same change rather than shipping it and noting it for later.
+
 **If the feature surfaces anything to the player** — a decision, action, prompt, keyword, icon, badge,
 label, or any client-visible state — **the UI is part of this feature, not a follow-up.** Build it in the
 same change and trace the full player flow until a human can actually see and act on it in the running
@@ -195,10 +202,11 @@ SDK and client tests are supporting layers; don't let them substitute for engine
 details (`ScenarioTestBase` vs `GameTestDriver`, inline test cards) and which command to run: the
 **`verify`** skill.
 
-**Never write or run Playwright/E2E tests from this skill** — no `e2e-scenarios/` specs, no
-`just e2e-test`, no `just e2e-loop`, even for UI work. Client changes are covered by
-`cd web-client && npm run typecheck` plus the engine/server tests above. E2E runs take too long; if a UI
-flow needs checking, test it manually in the running app instead.
+**New UI/UX must be seen, not just typechecked.** Set the board up (the **`generate-scenario`** skill
+writes a scenario for the dev scenario loader), drive the new flow in a real browser — by hand or with
+Playwright as a browser driver — and make sure it looks clean and polished: layout, labels, highlighting,
+nothing overlapping or stale — and fix what looks off. **Don't write E2E specs and don't run the E2E suite** (`just e2e*`) — it
+takes too long. Manual verification is the check.
 
 ## Step 8: Update the docs in the same change
 

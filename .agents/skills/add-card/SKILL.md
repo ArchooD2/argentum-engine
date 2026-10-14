@@ -219,6 +219,13 @@ hand/play, the relevant opposing permanents, the decision you want to trigger).
 
 **Always.** Walk the card from the player's side: what do they see, and what do they click?
 
+**Good UI/UX is a requirement, not a nice-to-have.** Players judge the game by how it feels to play, so
+a mechanic that works but is confusing, cluttered, ugly or clumsy to use is not done. The bar: a player
+who knows Magic but has never seen this card understands what is being asked and acts without
+hesitation — clear wording, the obvious place to click, the right board context visible, consistent with
+how similar interactions already look, and visually polished. When the existing flow falls short, fix it
+in the same change rather than shipping it and noting it for later.
+
 For each ability or mode: how is it activated (action-menu button, auto-trigger — and does the button
 text read clearly)? What decisions follow (targeting, selecting, choosing, ordering)? Which component in
 `web-client/src/components/decisions/` handles each one, and does `DecisionUI.tsx` route the engine's
@@ -242,12 +249,16 @@ UX failures to catch:
 If the existing components don't serve the card well, prefer extending one over creating a new one — but
 build what's genuinely needed.
 
-## Step 7: No E2E tests
+## Step 7: Verify the UI manually
 
-**Never write or run Playwright/E2E tests from this skill** — no `e2e-scenarios/` specs, no
-`just e2e-test`, no `just e2e-loop`, even when Step 6 touched the UI. Cover the card with scenario tests
-and `cd web-client && npm run typecheck` for client changes. E2E runs take too long; if a UI flow needs
-checking, test it manually in the running app instead.
+**Only if Step 6 introduced a new visual or UX mechanic.** Then it isn't done until you've seen it: set
+the board up (the **`generate-scenario`** skill writes a scenario for the dev scenario loader), drive the
+flow in a real browser — by hand or with Playwright as a browser driver — and check it looks clean and
+polished: layout, labels, highlighting, nothing overlapping or stale. Fix what looks off before
+moving on.
+
+**Don't write E2E specs and don't run the E2E suite** (`just e2e*`) — it takes too long. Manual
+verification is the check.
 
 ## Step 8: Trace new engine mechanics
 

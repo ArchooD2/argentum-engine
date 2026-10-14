@@ -35,12 +35,12 @@ waiting on.
 | Card snapshots after an intentional change | `just rebless-cards` |
 | SDK types added, removed or re-documented | `just sdk-index`, then `just test-class SdkSurfaceBaselineTest` |
 | Web client | `cd web-client && npm run typecheck` |
-| Visual / UX mechanic | `just e2e-test <pattern>` — **never** when called from `add-card` or `add-feature` |
+| Visual / UX mechanic | Verify manually in a browser (a `generate-scenario` board, by hand or Playwright-driven). Don't run the E2E suite (`just e2e*`) for `add-card` / `add-feature` work — it takes too long |
 | Registry / executor / evaluator signature changed | the full module suite, not one class |
 
 Benchmarks (`*Benchmark` in `:ai`) are too slow for routine validation — run `*Test` classes.
 
-For unattended loops (not `add-card` / `add-feature` work), verify player-visible flows with `just e2e-loop <test-path> <unused-client-port>
+For unattended loops, verify player-visible flows with `just e2e-loop <test-path> <unused-client-port>
 <unused-server-port>` from the unit's worktree instead of a personal desktop browser. It starts isolated
 servers and dedicated headless Chromium, retaining screenshots even on success. Follow
 [`docs/e2e-test-patterns.md`](../../../docs/e2e-test-patterns.md#unattended-loop-verification) for flow

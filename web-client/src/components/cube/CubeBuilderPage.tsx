@@ -9,7 +9,7 @@
  * ({@link PastePane}).
  *
  * Like the deckbuilder it has two views, toggled in the toolbar and kept in the URL (`?view=cube`):
- * "Cards to add" — the catalog grid with the cube in the right rail — and "Cube", the deckbuilder's
+ * "Search cards" — the catalog grid with the cube in the right rail — and "Cube list", the deckbuilder's
  * Deck view for a cube: the hovered card large on the left and the whole cube in flowing columns
  * ({@link CubeColumns}), edited in place, with a search-and-add bar above it.
  *
@@ -17,10 +17,16 @@
  * dialog, so the two surfaces can't drift.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useMatch, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useLocation, useMatch, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { listBasicLandSets } from '@/api/cubeSets'
 import type { CardSummary } from '@/components/deckbuilder/cardFilter'
-import { BuilderModeSwitch } from '@/components/deckbuilder/BuilderModeSwitch'
+import {
+  BuilderModeSwitch,
+  clearWorkingCopy,
+  peekWorkingCopy,
+  stashWorkingCopy,
+} from '@/components/deckbuilder/BuilderModeSwitch'
+import { BuilderViewToggle } from '@/components/deckbuilder/BuilderViewToggle'
 import { CardGrid, FilterSection, SearchBar, useCardBrowse, useCardCatalog } from '@/components/deckbuilder/browser'
 import { PageShell, pageStyles as p } from '@/components/ui/PageShell'
 import { type UnifiedCube, useUnifiedCubes } from '@/store/useUnifiedCubes'
@@ -32,7 +38,7 @@ import { CubeStats } from './CubeStats'
 import { PastePane, SetPane } from './CubeSources'
 import { ShareCubeDialog } from './ShareCubeDialog'
 import { useCardHover } from './useCardHover'
-import { type BasicLandSetOption, useCubeDraft } from './useCubeDraft'
+import { type BasicLandSetOption, type CubeWorkingCopy, useCubeDraft } from './useCubeDraft'
 import { ManaCost } from '@/components/ui/ManaSymbols'
 import { useHoverStore } from '@/components/ui/hoverStore'
 import db from '@/components/deckbuilder/deckbuilder.module.css'
@@ -127,7 +133,13 @@ function CubeBuilder({
   onSaved: (cube: UnifiedCube) => void
 }) {
   const navigate = useNavigate()
+  const location = useLocation()
   const [search, setSearch] = useSearchParams()
+  // Unsaved edits left here by a switch to deck mode come back exactly as they were.
+  const [resume] = useState(() => peekWorkingCopy<CubeWorkingCopy>('cube', location.pathname))
+  useEffect(() => {
+    if (resume) clearWorkingCopy('cube')
+  }, [resume])
   const { catalog, setInfos, loading, error } = useCardCatalog()
   const byName = useMemo(() => {
     const map = new Map<string, CardSummary>()
@@ -135,7 +147,7 @@ function CubeBuilder({
     return map
   }, [catalog])
   const lookup = useCallback((name: string) => byName.get(name.toLowerCase()), [byName])
-  const draft = useCubeDraft({ cube, availableSets, lookup, catalogReady: !loading && !error, onSaved })
+  const draft = useCubeDraft({ cube, availableSets, lookup, catalogReady: !loading && !error, onSaved, resume })
   const { entries, totalCards, unresolved, dirty, saving } = draft
 
   // Basics aren't cube cards — every cube's deckbuilding hands them out from its land-art set.
@@ -215,34 +227,27 @@ function CubeBuilder({
   )
 
   const guard = (proceed: () => void) => (dirty ? setPendingExit(() => proceed) : proceed())
+  // Flipping to deck mode is a tab switch, not an exit: the unsaved cube waits for the way back.
+  const stashDraft = () => {
+    const copy = draft.workingCopy()
+    if (copy) stashWorkingCopy('cube', copy)
+    else clearWorkingCopy('cube')
+  }
   const openTool = (action: () => void) => () => {
     setToolsOpen(false)
     action()
   }
 
   return (
-    <PageShell title={<BuilderModeSwitch mode="cube" guard={guard} />} fit width="full" plain>
+    <PageShell title={<BuilderModeSwitch mode="cube" onLeave={stashDraft} />} fit width="full" plain>
       <div className={db.toolbar}>
-        <div className={db.viewToggle} role="group" aria-label="View mode">
-          <button
-            type="button"
-            className={db.viewToggleButton}
-            onClick={() => setViewMode('cards')}
-            aria-pressed={viewMode === 'cards'}
-            title="Browse the catalog and click cards to add them"
-          >
-            Cards to add
-          </button>
-          <button
-            type="button"
-            className={db.viewToggleButton}
-            onClick={() => setViewMode('cube')}
-            aria-pressed={viewMode === 'cube'}
-            title="See the whole cube in columns, grouped by type, colour or rarity"
-          >
-            Cube
-          </button>
-        </div>
+        <BuilderViewToggle
+          className={db.viewToggle}
+          noun="Cube"
+          count={totalCards}
+          view={viewMode === 'cube' ? 'list' : 'cards'}
+          onChange={(v) => setViewMode(v === 'list' ? 'cube' : 'cards')}
+        />
         {/* Narrow screens: one tab bar picks the pane and stands in for the view toggle. */}
         <div className={db.paneTabs} role="tablist" aria-label="Cube builder panes">
           {(['cards', 'filters'] as const).map((p) => (
@@ -407,7 +412,7 @@ function CubeBuilder({
                 <div className={db.deckCentricEmpty}>
                   <p className={db.deckCentricEmptyText}>
                     This cube is empty. Type a card name above, start from a whole set with{' '}
-                    <strong>Add a set</strong>, or switch to <strong>Cards to add</strong> to browse the catalog.
+                    <strong>Add a set</strong>, or switch to <strong>Search cards</strong> to browse the catalog.
                   </p>
                 </div>
               }

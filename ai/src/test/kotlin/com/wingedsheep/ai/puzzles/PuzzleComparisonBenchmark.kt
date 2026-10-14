@@ -160,6 +160,9 @@ class PuzzleComparisonBenchmark : ScenarioTestBase() {
                 // Our own planeswalkers defended, and spent before they die.
                 AiProfile.PRODUCTION_WALKERDEFENCE,
                 AiProfile.PRODUCTION_CANDIDATE_WALKERDEFENCE,
+                // Enablers cast before the spells they discount.
+                AiProfile.PRODUCTION_ENABLERS,
+                AiProfile.PRODUCTION_CANDIDATE_ENABLERS,
                 // A precombat pump priced by the attack it buys.
                 AiProfile.PRODUCTION_PLANPUMPS,
                 AiProfile.PRODUCTION_CANDIDATE_PLANPUMPS,

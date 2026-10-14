@@ -233,6 +233,9 @@ object ArenaAgents {
         // attack, blocks priced by the walker they save.
         ArenaAgent("production-walkerdefence", AiProfile.PRODUCTION_WALKERDEFENCE),
         ArenaAgent("production-candidate-walkerdefence", AiProfile.PRODUCTION_CANDIDATE_WALKERDEFENCE),
+        // A spell scored as the best spell it makes cheaper: enablers cast before their payoffs.
+        ArenaAgent("production-enablers", AiProfile.PRODUCTION_ENABLERS),
+        ArenaAgent("production-candidate-enablers", AiProfile.PRODUCTION_CANDIDATE_ENABLERS),
         // A precombat pump priced by the attack it buys, when it changes who attacks.
         ArenaAgent("production-planpumps", AiProfile.PRODUCTION_PLANPUMPS),
         ArenaAgent("production-candidate-planpumps", AiProfile.PRODUCTION_CANDIDATE_PLANPUMPS),

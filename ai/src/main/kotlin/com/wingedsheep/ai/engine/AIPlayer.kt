@@ -342,6 +342,7 @@ class AIPlayer(
                     defendPlaneswalkers = profile.defendPlaneswalkers,
                     landDropUnlocksSpells = profile.landDropUnlocksSpells,
                     activatedPumpsNeedAPlannedAttack = profile.activatedPumpsNeedAPlannedAttack,
+                    enablersFirst = profile.enablersFirst,
                     precombatPumpsForThePlan = profile.precombatPumpsForThePlan,
                     holdInstantSpeedDeploys = profile.holdInstantSpeedDeploys,
                     // Same seam as `CombatAdvisor`'s `lifeWeight`: a raw Phase 9 profile resolves

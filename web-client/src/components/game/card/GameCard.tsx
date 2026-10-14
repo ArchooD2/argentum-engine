@@ -1,3 +1,4 @@
+import { CounterAllocationControls } from './CounterAllocationControls'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useGameStore } from '@/store/gameStore.ts'
 import { useHasLegalActions } from '@/store/selectors.ts'
@@ -3009,6 +3010,9 @@ function GameCardImpl({
         {nonLegendaryChip}
         {grantedLegendaryChip}
         {cardElement}
+        {/* Allocation controls stay outside the clipped, rotating card. Narrow cards get a
+            compact count above two full-size buttons, which can extend beyond the art. */}
+        <CounterAllocationControls cardId={card.id} cardName={card.name} cardWidth={width} />
       </div>
       </RenderProfiler>
     )

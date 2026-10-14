@@ -67,6 +67,53 @@ class LoopTuiTest(unittest.TestCase):
         self.assertIsNone(loop_tui.last_json(Path(f.name), '"nope"'))
         Path(f.name).unlink()
 
+    def test_activity_follows_claude_subagents_and_their_own_actions(self):
+        import json
+        events = [
+            {"type": "assistant", "timestamp": "2026-10-14T06:30:00Z", "parent_tool_use_id": None,
+             "message": {"content": [{"type": "text", "text": "Working on: step 6\nmore"},
+                                     {"type": "tool_use", "id": "t1", "name": "Agent",
+                                      "input": {"description": "Implement G38", "prompt": "Build it"}}]}},
+            {"type": "system", "subtype": "task_started", "tool_use_id": "t1", "task_type": "local_agent",
+             "description": "Implement G38"},
+            {"type": "assistant", "timestamp": "2026-10-14T06:31:00Z", "parent_tool_use_id": "t1",
+             "message": {"content": [{"type": "tool_use", "id": "t2", "name": "Bash",
+                                      "input": {"command": "cd /repo/.claude/worktrees/x && just loop-gate"}}]}},
+            {"type": "system", "subtype": "task_progress", "tool_use_id": "t1",
+             "usage": {"total_tokens": 5000, "tool_uses": 7}},
+        ]
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / "20261014-083000-iter1.jsonl"
+            path.write_text("".join(json.dumps(e) + "\n" for e in events) + '{"type": "assistant", "timest')
+            activity = loop_tui.Activity()
+            activity.follow(path)
+            agent = activity.agents["t1"]
+            self.assertTrue(agent.running)
+            self.assertEqual((agent.label, agent.prompt, agent.tools, agent.tokens), ("Implement G38", "Build it", 7, 5000))
+            self.assertEqual(agent.feed[-1][1], "→ Bash: just loop-gate")
+            self.assertEqual(activity.main.feed[0][1], "💬 Working on: step 6")
+            # The half-written last line is finished by a later append, not dropped.
+            with open(path, "a") as f:
+                f.write('amp": "2026-10-14T06:40:00Z", "parent_tool_use_id": null, "message": {"content": []}}\n')
+                f.write(json.dumps({"type": "user", "parent_tool_use_id": None, "message": {"content": [
+                    {"type": "tool_result", "tool_use_id": "t1", "is_error": False}]}}) + "\n")
+            activity.follow(path)
+        self.assertEqual(agent.status, "done")
+        self.assertFalse(agent.running)
+        self.assertEqual(activity.main.feed[-1][1], "🤖 Implement G38 done after 10 min, 7 tool calls")
+
+    def test_codex_calls_read_as_their_command_or_patched_file(self):
+        exec_call = 'text(await tools.exec_command({cmd:"cd /w && git status --short\\nls",workdir:"/w"}));'
+        self.assertEqual(loop_tui.codex_call_line("exec", exec_call), "$ git status --short")
+        patch = 'tools.apply_patch("*** Begin Patch\\n*** Add File: /w/review/final.md\\n+x\\n*** Update File: /w/a.kt")'
+        self.assertEqual(loop_tui.codex_call_line("exec", patch), "✎ add final.md (+1 more)")
+        self.assertEqual(loop_tui.codex_call_line("shell", '{"command": ["bash", "-lc", "ls"]}'), "$ bash -lc ls")
+        self.assertEqual(loop_tui.shell_line("/bin/zsh -lc 'gh pr view 3'"), "$ gh pr view 3")
+
+    def test_session_start_comes_from_the_transcript_name(self):
+        start = loop_tui.session_start(Path("20261014-071535-iter6.jsonl"))
+        self.assertEqual(datetime.fromtimestamp(start), datetime(2026, 10, 14, 7, 15, 35))
+
     def test_watching_a_loop_without_a_log_fails_cleanly(self):
         self.assertEqual(loop_tui.main(["--name", "no-such-loop-zz"]), 1)
 

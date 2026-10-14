@@ -10,7 +10,10 @@ draws what it is doing from the loop's log, its open PRs and the set's progress:
 
 Keys:  s  stop after the current job (press again to cancel)
        q  quit — stops the loop now when this dashboard started it, or just closes the viewer
-       l  show / hide the raw log tail
+       a  switch between the dashboard and the agents view (↑/↓ picks the agent whose actions it shows)
+       l  switch the dashboard's bottom panel between live activity and the raw loop log
+The live activity is read from the running session's transcript: every tool call, the session's own
+and each subagent's — so a session that has handed its work to a subagent never looks frozen.
 LOOP_TUI=0 keeps the old plain line-by-line output.
 """
 from __future__ import annotations
@@ -327,12 +330,301 @@ def read_log(loop):
 
 
 # ---------------------------------------------------------------------------------------------
+# Live activity: the running session's own transcript, read incrementally. The loop log carries only
+# the milestones a session prints; this is every tool call, the session's and each subagent's.
+
+TRANSCRIPT = re.compile(r"transcript (\S+\.jsonl)")
+FEED_KEEP = 500
+
+
+def stamp(text, fallback):
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).astimezone().replace(tzinfo=None)
+    except (AttributeError, ValueError):
+        return fallback
+
+
+def first_line(value, cols=160):
+    lines = [l.strip() for l in str(value or "").splitlines() if l.strip()]
+    return lines[0][:cols] if lines else ""
+
+
+LEADING_CD = re.compile(r"^cd \S+ && ")
+
+
+def tool_line(name, args):
+    detail = next((args[k] for k in ("description", "command", "skill", "file_path", "pattern", "prompt", "url")
+                   if args.get(k)), "")
+    # Loop agents prefix every command with `cd <worktree> &&`, which would fill the whole line.
+    detail = LEADING_CD.sub("", first_line(detail, 400))[:160]
+    return f"{name}: {detail}" if detail else str(name)
+
+
+CODEX_CMD = re.compile(r'\bcmd:\s*"((?:[^"\\]|\\.)*)"')
+PATCH_FILE = re.compile(r"\*\*\* (Add|Update|Delete) File: ([^\\\n\"]+)")
+
+
+def codex_call_line(name, args):
+    """A Codex tool call as one line: the shell command when it runs one (its exec scripts wrap them)."""
+    files = PATCH_FILE.findall(args or "")
+    if files:
+        op, path = files[0]
+        more = f" (+{len(files) - 1} more)" if len(files) > 1 else ""
+        return f"✎ {op.lower()} {Path(path.strip()).name}{more}"
+    m = CODEX_CMD.search(args or "")
+    if m:
+        try:
+            return shell_line(json.loads(f'"{m.group(1)}"'))
+        except ValueError:
+            return shell_line(m.group(1))
+    try:
+        parsed = json.loads(args or "{}")
+        if isinstance(parsed, dict):
+            if parsed.get("cmd") or parsed.get("command"):
+                cmd = parsed.get("cmd") or parsed.get("command")
+                return shell_line(" ".join(cmd) if isinstance(cmd, list) else cmd)
+            return tool_line(name, parsed)
+    except ValueError:
+        pass
+    return f"{name}: {first_line(args)}"
+
+
+def shell_line(command):
+    m = re.match(r"^/bin/\w+ -lc (['\"])(.*)\1$", command or "", re.S)
+    return "$ " + LEADING_CD.sub("", first_line(m.group(2) if m else command, 400))[:160]
+
+
+class Agent:
+    """The session itself or one of its subagents, with its own feed of actions."""
+
+    def __init__(self, label, started=None, prompt=""):
+        self.label, self.started, self.prompt = label, started, prompt
+        self.ended, self.status, self.tools, self.tokens = None, "running", 0, 0
+        self.last, self.thread = started, None
+        self.feed: list[tuple[datetime, str]] = []
+
+    @property
+    def running(self):
+        return self.ended is None
+
+    def add(self, ts, text):
+        self.feed.append((ts, text))
+        del self.feed[:-FEED_KEEP]
+        self.last = ts
+
+
+class Cursor:
+    """How far a JSONL file has been read; `partial` holds a line still being written."""
+
+    def __init__(self, agent=None):
+        self.offset, self.partial, self.agent = 0, b"", agent
+
+    def new_lines(self, path):
+        try:
+            with open(path, "rb") as f:
+                f.seek(self.offset)
+                data = f.read()
+        except OSError:
+            return []
+        self.offset += len(data)
+        lines = (self.partial + data).split(b"\n")
+        self.partial = lines.pop()
+        return [l for l in lines if l.strip()]
+
+
+class Activity:
+    """Follows one session transcript (Claude stream-json or Codex exec JSON) and, for Codex, the
+    rollout files of the subagents it spawns."""
+
+    def __init__(self, path=None):
+        self.path, self.cursor = path, Cursor()
+        self.main = Agent("session")
+        self.agents: dict[str, Agent] = {}
+        self.feed: list[tuple[datetime, Agent, str]] = []
+        self.clock = None  # the newest timestamp seen; events without one happened then
+        self.thread = None
+        self.rollouts: dict[Path, Cursor] = {}  # a Codex subagent's rollout (agent None: not ours)
+        self.scanned = 0.0
+
+    def follow(self, path):
+        if path != self.path:
+            self.__init__(path)
+        if path:
+            self.read()
+
+    def read(self):
+        for line in self.cursor.new_lines(self.path):
+            try:
+                event = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(event, dict):
+                self.handle(event)
+        if self.thread and time.time() - self.scanned > 5:
+            self.scanned = time.time()
+            self.scan_codex_subagents()
+        for path, cursor in list(self.rollouts.items()):
+            if cursor.agent is not None and cursor.agent.running:
+                self.read_rollout(path, cursor)
+
+    def timeline(self, count):
+        """The newest `count` actions of every agent, in time order (agents are read one after another)."""
+        return sorted(self.feed, key=lambda f: f[0])[-count:] if count else []
+
+    def note(self, who, ts, text):
+        who.add(ts, text)
+        self.feed.append((ts, who, text))
+        del self.feed[:-FEED_KEEP]
+
+    def agent(self, key, label, ts, prompt=""):
+        if key not in self.agents:
+            self.agents[key] = Agent(label or "subagent", ts, prompt)
+            self.note(self.main, ts, f"🤖 started {self.agents[key].label}")
+        a = self.agents[key]
+        a.prompt = a.prompt or prompt
+        return a
+
+    def finish(self, a, ts, outcome):
+        if not a.running:
+            return
+        a.ended, a.status = ts, outcome
+        took = human((ts - a.started).total_seconds()) if a.started else "?"
+        self.note(self.main, ts, f"🤖 {a.label} {outcome} after {took}, {a.tools} tool calls")
+
+    # --- Claude Code stream-json
+    def handle(self, e):
+        kind = e.get("type")
+        if kind == "thread.started" or (kind or "").startswith(("item.", "turn.")) or kind == "error":
+            return self.handle_codex(e)
+        ts = stamp(e.get("timestamp"), self.clock or datetime.now())
+        if e.get("timestamp"):
+            self.clock = ts
+        now = self.clock or datetime.now()
+        parent = e.get("parent_tool_use_id")
+        if kind == "assistant":
+            who = self.agents.get(parent) or (self.agent(parent, "subagent", ts) if parent else self.main)
+            for c in (e.get("message") or {}).get("content") or []:
+                if c.get("type") == "tool_use":
+                    args = c.get("input") or {}
+                    if c.get("name") in ("Agent", "Task"):
+                        self.agent(c.get("id"), args.get("description"), ts, args.get("prompt") or "")
+                    else:
+                        who.tools += 1
+                        self.note(who, ts, "→ " + tool_line(c.get("name"), args))
+                elif c.get("type") == "text" and first_line(c.get("text")):
+                    self.note(who, ts, "💬 " + first_line(c.get("text"), 200))
+        elif kind == "user" and not parent:
+            for c in (e.get("message") or {}).get("content") or []:
+                if isinstance(c, dict) and c.get("type") == "tool_result" and c.get("tool_use_id") in self.agents:
+                    self.finish(self.agents[c["tool_use_id"]], now, "failed" if c.get("is_error") else "done")
+        elif kind == "system":
+            key, sub = e.get("tool_use_id"), e.get("subtype")
+            if sub == "task_started" and e.get("task_type") == "local_agent":
+                self.agent(key, e.get("description"), now, e.get("prompt") or "")
+            elif sub == "task_progress" and key in self.agents:
+                usage = e.get("usage") or {}
+                a = self.agents[key]
+                a.tokens = usage.get("total_tokens", a.tokens)
+                a.tools = max(a.tools, usage.get("tool_uses", 0))
+            elif sub == "task_notification" and key in self.agents:
+                status_ = e.get("status") or "done"
+                self.finish(self.agents[key], now, "done" if status_ == "completed" else status_)
+        elif kind == "result":
+            self.main.ended = now
+
+    # --- Codex exec JSON
+    def handle_codex(self, e):
+        kind, ts = e.get("type"), datetime.now()
+        # Its tool calls and messages are read from the session's own rollout (scan_codex_subagents),
+        # which, unlike this stream, carries timestamps.
+        if kind == "thread.started":
+            self.thread = e.get("thread_id")
+        elif kind in ("error", "turn.failed"):
+            self.note(self.main, ts, "! " + first_line(e.get("message") or (e.get("error") or {}).get("message")))
+        elif kind == "turn.completed":
+            self.main.ended = ts
+
+    def scan_codex_subagents(self):
+        """Codex logs the session and each subagent to a rollout; its first line names the parent thread."""
+        threads = {self.thread} | {a.thread for a in self.agents.values() if a.thread}
+        since = session_start(self.path) - 60
+        days = sorted(CODEX_SESSIONS.glob("*/*/*"), reverse=True)[:2]
+        for path in sorted((p for d in days for p in d.glob("rollout-*.jsonl")), key=lambda p: p.name):
+            if path in self.rollouts:
+                continue
+            try:
+                if path.stat().st_mtime < since:
+                    continue
+                with open(path) as f:
+                    meta = (json.loads(f.readline() or "{}").get("payload")) or {}
+            except (OSError, ValueError):
+                continue
+            if meta.get("id") == self.thread:
+                self.rollouts[path] = Cursor(self.main)
+                continue
+            # The approval reviewer behind --approve-for-me is a rollout too, but no agent the session spawned.
+            if meta.get("parent_thread_id") not in threads or meta.get("thread_source") == "guardian_review":
+                if time.time() - path.stat().st_mtime > 60:
+                    self.rollouts[path] = Cursor()  # settled and not ours: never look again
+                continue
+            label = Path(meta.get("agent_path") or "").name or meta.get("agent_nickname") or "subagent"
+            a = self.agent(str(path), label, stamp(meta.get("timestamp"), datetime.now()))
+            a.thread = meta.get("id")
+            self.rollouts[path] = Cursor(a)
+
+    def read_rollout(self, path, cursor):
+        a = cursor.agent
+        for line in cursor.new_lines(path):
+            try:
+                e = json.loads(line)
+            except ValueError:
+                continue
+            p, ts = e.get("payload") or {}, stamp(e.get("timestamp"), datetime.now())
+            if e.get("type") == "response_item" and p.get("type") in ("custom_tool_call", "function_call"):
+                a.tools += 1
+                self.note(a, ts, codex_call_line(p.get("name"), p.get("input") or p.get("arguments")))
+            elif e.get("type") == "response_item" and p.get("type") == "message" and p.get("role") == "assistant":
+                text = " ".join(c.get("text", "") for c in p.get("content") or [] if isinstance(c, dict))
+                if first_line(text):
+                    self.note(a, ts, "💬 " + first_line(text, 200))
+            elif e.get("type") == "event_msg" and p.get("type") == "token_count":
+                a.tokens = (((p.get("info") or {}).get("total_token_usage")) or {}).get("total_tokens", a.tokens)
+            elif e.get("type") == "event_msg" and p.get("type") == "task_complete":
+                if a is self.main:
+                    a.ended = ts
+                else:
+                    self.finish(a, ts, "done")
+
+
+def session_start(transcript):
+    """Epoch seconds a session began: the launcher stamps it into the transcript's name."""
+    m = re.match(r"(\d{8}-\d{6})", transcript.name)
+    if m:
+        return datetime.strptime(m.group(1), "%Y%m%d-%H%M%S").timestamp()
+    try:
+        st = transcript.stat()
+        return getattr(st, "st_birthtime", st.st_mtime)
+    except OSError:
+        return time.time()
+
+
+def current_transcript(loop, events):
+    for _, text in reversed(events):
+        if m := TRANSCRIPT.search(text):
+            path = Path(m.group(1))
+            return path if path.is_absolute() else loop.repo / path
+    return None
+
+
+# ---------------------------------------------------------------------------------------------
 # View
 
 class Screen:
     def __init__(self, stdscr, loop, child, command):
         self.s, self.loop, self.child, self.command = stdscr, loop, child, command
         self.show_log = False
+        self.activity = Activity()
+        self.view, self.selected = "dash", 0
         self.flash = ""
         self.quit_armed = 0.0
         try:
@@ -352,7 +644,7 @@ class Screen:
                     (curses.color_pair(i) for i in range(1, 6))
             except curses.error:
                 pass
-        self.DIM, self.BOLD = curses.A_DIM, curses.A_BOLD
+        self.DIM, self.BOLD, self.REVERSE = curses.A_DIM, curses.A_BOLD, curses.A_REVERSE
         stdscr.timeout(500)
         # No insert/delete-line shortcuts: sections grow and shrink every frame, and terminals that
         # mishandle those sequences leave stale rows behind.
@@ -370,9 +662,36 @@ class Screen:
     def draw(self):
         loop, now = self.loop, datetime.now()
         events, milestones, tail = read_log(loop)
+        self.activity.follow(current_transcript(loop, events))
         with loop.lock:
             prs, progress, usage = list(loop.prs), loop.progress, dict(loop.usage)
         self.s.erase()
+        h, w = self.s.getmaxyx()
+        self.header(events, now)
+        if self.view == "agents":
+            self.draw_agents(now)
+        else:
+            self.draw_dashboard(events, milestones, tail, prs, progress, usage, now)
+
+        # Footer: the keys, and any transient message.
+        stopping = loop.stop_file.exists()
+        self.s.hline(h - 2, 0, curses.ACS_HLINE, w)
+        stop_key = "s cancel stop" if stopping else "s stop after current job"
+        quit_key = "q stop now" if self.child else "q close viewer"
+        if self.view == "agents":
+            keys = f" ↑/↓ pick agent   a dashboard   {stop_key}   {quit_key}"
+        else:
+            keys = f" a agents   l {'activity' if self.show_log else 'raw log'}   {stop_key}   {quit_key}"
+        if self.flash and time.time() - self.quit_armed < 3:
+            keys = " " + self.flash
+        try:
+            self.s.addstr(h - 1, 0, clip(keys, w - 1), self.CYAN)
+        except curses.error:
+            pass
+        self.s.refresh()
+
+    def header(self, events, now):
+        loop = self.loop
         h, w = self.s.getmaxyx()
 
         # Header: what this is, whether it runs, how long.
@@ -393,10 +712,24 @@ class Screen:
         self.put(0, max(1, w - width(badge + since) - 2), badge + since, attr | self.BOLD)
         self.s.hline(1, 0, curses.ACS_HLINE, w)
 
+    def draw_dashboard(self, events, milestones, tail, prs, progress, usage, now):
+        loop = self.loop
+        h, w = self.s.getmaxyx()
         y = 2
         # NOW
         y = self.usage_line(y, usage)
-        y = self.section(y, "NOW", self.now_lines(events, milestones, now))
+        now_lines = self.now_lines(events, milestones, now)
+        latest = self.activity.timeline(1)
+        if latest and events and status.ITERATION.match(events[-1][1]):
+            quiet = (now - latest[0][0]).total_seconds()
+            # A session that has gone quiet this long is more likely hung than thinking.
+            colour = self.RED if quiet > 1800 else self.YELLOW if quiet > 600 else self.DIM
+            now_lines.append((f"  last action {latest[0][0]:%H:%M:%S}", colour, f"{human(quiet)} ago", colour))
+        y = self.section(y, "NOW", now_lines)
+        agents = list(self.activity.agents.values())
+        if agents:
+            shown = [a for a in agents if a.running] + [a for a in agents if not a.running][::-1][:2]
+            y = self.section(y, "AGENTS", [self.agent_row(a, now) for a in shown])
         # PRs
         pr_lines = []
         for p in prs:
@@ -413,27 +746,53 @@ class Screen:
         y = self.section(y, "PROGRESS", [(p, 0, "", 0) for p in prog])
         # HISTORY: one row per finished session, newest first.
         y = self.section(y, "HISTORY", self.history(events) or [("no session finished yet", self.DIM, "", 0)],
-                         limit=6)
+                         limit=4)
         # LAST SUMMARY
         summary = self.last_summary(events, milestones)
         if summary:
             y = self.section(y, "SUMMARY", [(t, 0, "", 0) for t in summary], wrap=True)
+        room = max(0, h - y - 3)
         if self.show_log:
-            room = max(0, h - y - 3)
-            y = self.section(y, "LOG", [(l, self.DIM, "", 0) for l in tail[-room:]] if room else [])
+            self.section(y, "LOG", [(l, self.DIM, "", 0) for l in tail[-room:]] if room else [])
+        else:
+            feed = [self.feed_row(ts, who, text) for ts, who, text in self.activity.timeline(room)]
+            self.section(y, "ACTIVITY", feed or [("nothing from the session yet", self.DIM, "", 0)])
 
-        # Footer: the keys, and any transient message.
-        self.s.hline(h - 2, 0, curses.ACS_HLINE, w)
-        stop_key = "s cancel stop" if stopping else "s stop after current job"
-        quit_key = "q stop now" if self.child else "q close viewer"
-        keys = f" {stop_key}   {quit_key}   l {'hide' if self.show_log else 'show'} log"
-        if self.flash and time.time() - self.quit_armed < 3:
-            keys = " " + self.flash
-        try:
-            self.s.addstr(h - 1, 0, clip(keys, w - 1), self.CYAN)
-        except curses.error:
-            pass
-        self.s.refresh()
+    def draw_agents(self, now):
+        """Every agent of the running session: pick one with ↑/↓ to follow its own actions."""
+        h, w = self.s.getmaxyx()
+        act = self.activity
+        main = act.main
+        main.started = main.started or (act.feed[0][0] if act.feed else None)
+        agents = [main] + list(act.agents.values())
+        self.selected = max(0, min(self.selected, len(agents) - 1))
+        rows = [self.agent_row(a, now) for a in agents]
+        rows = [(t, attr | (self.REVERSE if i == self.selected else 0), r, ra) for i, (t, attr, r, ra) in enumerate(rows)]
+        # Keep the selection on screen when the list is longer than a third of it.
+        fit = max(3, (h - 6) // 3)
+        first = max(0, min(self.selected - fit // 2, len(rows) - fit))
+        y = self.section(2, "AGENTS", rows[first:first + fit])
+        pick = agents[self.selected]
+        if pick.prompt:
+            y = self.section(y, "BRIEF", [(" ".join(pick.prompt.split())[:1000], self.DIM, "", 0)], wrap=True, limit=3)
+        room = max(0, h - y - 3)
+        feed = [(f"{ts:%H:%M:%S}  {text}", 0, "", 0) for ts, text in pick.feed[-room:]] if room else []
+        self.section(y, "ACTIONS", feed or [("no actions yet", self.DIM, "", 0)])
+
+    def agent_row(self, a, now):
+        if a.running:
+            icon, colour = "●", self.CYAN
+        else:
+            icon, colour = ("✓", self.GREEN) if a.status == "done" else ("✗", self.RED)
+        took = human(((a.ended or now) - a.started).total_seconds()) if a.started else ""
+        right = " · ".join(x for x in (took, f"{a.tools} tools", f"{a.tokens // 1000}k tok" if a.tokens else "") if x)
+        last = a.feed[-1][1] if a.feed and a.running else ""
+        return (f"{icon} {a.label}" + (f"  {last}" if last else ""), 0 if a.running else self.DIM, right, colour)
+
+    def feed_row(self, ts, who, text):
+        name = clip(who.label, 22)
+        return (f"{ts:%H:%M:%S}  {name}{' ' * max(1, 23 - width(name))}{text}",
+                self.DIM if who is self.activity.main else 0, "", 0)
 
     def section(self, y, title, lines, limit=None, wrap=False):
         h, w = self.s.getmaxyx()
@@ -536,6 +895,12 @@ class Screen:
                 loop.stop_file.touch()
         elif ch in (ord("l"), ord("L")):
             self.show_log = not self.show_log
+        elif ch in (ord("a"), ord("A"), 9):
+            self.view = "dash" if self.view == "agents" else "agents"
+        elif ch in (curses.KEY_UP, ord("k")):
+            self.selected -= 1
+        elif ch in (curses.KEY_DOWN, ord("j")):
+            self.selected += 1
         elif ch in (ord("q"), ord("Q"), 3):
             if not self.child or self.child.poll() is not None:
                 return False

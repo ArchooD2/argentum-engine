@@ -639,16 +639,8 @@ class TriggerMatcher(
                 if (event !is LandTappedForManaEvent) return false
                 if (binding == TriggerBinding.SELF && event.landId != sourceId) return false
                 if (!matchesPlayer(state, trigger.player, event.tapperId, controllerId)) return false
-                val filter = trigger.landFilter
-                if (filter != null) {
-                    val predicateContext = com.wingedsheep.engine.handlers.PredicateContext(
-                        controllerId = controllerId,
-                        sourceId = sourceId
-                    )
-                    predicateEvaluator.matches(
-                        state, state.projectedState, event.landId, filter, predicateContext
-                    )
-                } else true
+                val filter = trigger.landFilter ?: return true
+                matchesLandFilter(state, filter, event.landId, sourceId, controllerId)
             }
             is EventPattern.LifeGainEvent -> {
                 event is LifeChangedEvent &&
@@ -1796,6 +1788,22 @@ class TriggerMatcher(
             TriggerBinding.ATTACHED -> false // handled by AttachmentTriggerDetector
         }
     }
+
+    /**
+     * [EventPattern.LandTappedForMana.landFilter] against the tapped land, relative to the trigger's
+     * source and controller. Shared by the main path and the ATTACHED path
+     * ([AttachmentTriggerDetector]) so the two can't disagree about which lands count.
+     */
+    fun matchesLandFilter(
+        state: GameState,
+        filter: com.wingedsheep.sdk.scripting.GameObjectFilter,
+        landId: EntityId,
+        sourceId: EntityId,
+        controllerId: EntityId,
+    ): Boolean = predicateEvaluator.matches(
+        state, state.projectedState, landId, filter,
+        com.wingedsheep.engine.handlers.PredicateContext(controllerId = controllerId, sourceId = sourceId)
+    )
 
     /**
      * Check if a Player filter matches the event's player. `EachOpponent` is a real opponent test

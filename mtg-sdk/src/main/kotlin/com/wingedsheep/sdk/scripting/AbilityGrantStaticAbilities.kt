@@ -35,6 +35,49 @@ data class GrantTriggeredAbility(
 }
 
 /**
+ * Grants a static ability to a filtered set of permanents — "Enchanted creature has
+ * 'You have no maximum hand size'" (Nerd Rage).
+ *
+ * The continuous-grant sibling of [GrantTriggeredAbility] / [GrantActivatedAbility] (whose
+ * fields are typed to their own ability families, so neither can carry a static) and of the
+ * one-shot `GrantStaticAbilityEffect` (a resolved "gains ... until end of turn", not a
+ * characteristic that lasts while the granter is in play). The holder gains [ability] in
+ * Layer 6 (CR 613.1f), so the grant follows the usual ability rules: it ends when the granter
+ * leaves or stops matching, and a holder that loses all abilities loses it too. A
+ * player-facing ability such as "You have no maximum hand size" then applies to the holder's
+ * controller — the "you" of an ability belongs to whoever controls the object that has it.
+ *
+ * [ability] is typed [ProjectedStaticAbility]: only a kind whose engine read consults the
+ * holder's projected static abilities can be granted this way, so a grant can't compile and then
+ * silently do nothing.
+ *
+ * @property ability The static ability to grant.
+ * @property filter The permanents that gain the ability, relative to the granting permanent.
+ */
+@SerialName("GrantStaticAbility")
+@Serializable
+data class GrantStaticAbility(
+    val ability: ProjectedStaticAbility,
+    val filter: GroupFilter = GroupFilter.attachedCreature()
+) : StaticAbility {
+    override val description: String = "${filter.description} have \"${ability.description}\""
+    override fun applyTextReplacement(replacer: TextReplacer): StaticAbility {
+        val newFilter = filter.applyTextReplacement(replacer)
+        val newAbility = ability.applyTextReplacement(replacer) as ProjectedStaticAbility
+        return if (newFilter !== filter || newAbility !== ability) copy(filter = newFilter, ability = newAbility) else this
+    }
+}
+
+/**
+ * A [StaticAbility] the engine reads off a permanent's *projected* static abilities
+ * (`ProjectedState.getStaticAbilities`) rather than its printed script, so a holder has it
+ * however it got it — printed, or granted by [GrantStaticAbility]. Implementing it is a promise
+ * about the engine half: the ability's point-of-use read must go through projection.
+ */
+@Serializable
+sealed interface ProjectedStaticAbility : StaticAbility
+
+/**
  * Grants an activated ability to a filtered set of objects in [recipientZone].
  *
  * Use [GroupFilter.attachedCreature] for "enchanted/equipped creature has ..." auras

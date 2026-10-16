@@ -540,6 +540,14 @@ data class AbilityOnStackComponent(
  *           on resolution (Rule 608.2b — targets must still be legal when the spell/ability resolves)
  * @property targetEntryStamps Object-identity stamps for the permanent targets (CR 400.7),
  *           captured when the targets were chosen — see [capture].
+ * @property targetingAttachmentHost The permanent the source Aura/Equipment was attached to when
+ *           the ability was put on the stack with its targets (after its costs were paid, so a
+ *           cost that sacrifices or unattaches the source leaves it null). A target requirement phrased relative to the source's host
+ *           ("target creature that's blocking equipped creature", Plasma Caster) was satisfied
+ *           against *that* creature, so the resolution re-check reads it too: the ability still
+ *           resolves if the Equipment has since left or moved to another creature, and fizzles only
+ *           when the target stops blocking the creature it was chosen against. Null for a source
+ *           that wasn't attached to anything.
  */
 @Serializable
 data class TargetsComponent(
@@ -548,8 +556,20 @@ data class TargetsComponent(
     val targetEntryStamps: Map<EntityId, Long> = emptyMap(),
     @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
     @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
-    val targetObjectRefs: Map<EntityId, com.wingedsheep.engine.state.ObjectRef> = emptyMap()
+    val targetObjectRefs: Map<EntityId, com.wingedsheep.engine.state.ObjectRef> = emptyMap(),
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    val targetingAttachmentHost: EntityId? = null,
 ) : Component {
+
+    /**
+     * The same requirements with [newTargets] chosen in place of the current ones (a retarget), each
+     * stamped as it becomes a target. The attachment host the requirements were first satisfied
+     * against is kept, though a retarget's own legality check reads the source's current host —
+     * the two differ only when the source was moved after the ability was put on the stack.
+     */
+    fun retargeted(state: GameState, newTargets: List<ChosenTarget>): TargetsComponent =
+        capture(state, newTargets, targetRequirements).copy(targetingAttachmentHost = targetingAttachmentHost)
 
     companion object {
         /**
@@ -572,10 +592,16 @@ data class TargetsComponent(
         fun capture(
             state: GameState,
             targets: List<ChosenTarget>,
-            targetRequirements: List<TargetRequirement> = emptyList()
+            targetRequirements: List<TargetRequirement> = emptyList(),
+            /** The stack object's source; its current attachment host becomes [targetingAttachmentHost]. */
+            sourceId: EntityId? = null,
         ): TargetsComponent = TargetsComponent(
             targets = targets,
             targetRequirements = targetRequirements,
+            targetingAttachmentHost = sourceId?.let {
+                state.getEntity(it)
+                    ?.get<com.wingedsheep.engine.state.components.battlefield.AttachedToComponent>()?.targetId
+            },
             targetEntryStamps = targets.filterIsInstance<ChosenTarget.Permanent>()
                 .filter { it.entityId in state.getBattlefield() }
                 .associate { it.entityId to entryStamp(state, it.entityId) },

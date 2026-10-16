@@ -73,6 +73,31 @@ fun GameState.consumeSingleUseMayPlayFor(cardId: EntityId, playerId: EntityId): 
 }
 
 /**
+ * The granter whose once-per-turn allowance ([MayPlayPermission.oncePerTurn]) playing [cardId]
+ * spends, or null when the play spends none. Read against the state *before* the play, while the
+ * card is still in exile and its grants can still be found.
+ *
+ * As with [consumeSingleUseMayPlayFor], an unlimited grant covering the card wins: the player
+ * chooses which permission they use, and burning the scarce one would never be their choice.
+ * Unlike the stored grants there, every candidate here was already gate-checked by
+ * [activeMayPlayFor], so a conditional unlimited grant shields the allowance too. A shield must
+ * offer the same mana relaxation, though: when the once-per-turn grant carries an any-color/any-type
+ * rider the cast may have leaned on, a rider-less unlimited grant couldn't have paid for it alone.
+ */
+fun GameState.oncePerTurnGranterToSpend(
+    cardId: EntityId,
+    playerId: EntityId,
+    conditionEvaluator: ConditionEvaluator,
+    cardRegistry: CardRegistry
+): EntityId? {
+    val active = activeMayPlayFor(cardId, playerId, conditionEvaluator, cardRegistry)
+    val limited = active.firstOrNull { it.oncePerTurn } ?: return null
+    fun relaxesMana(p: MayPlayPermission) = p.withAnyManaType || p.withAnyManaColor || p.colorlessAsAnyColor
+    val shielded = active.any { !it.oncePerTurn && (!relaxesMana(limited) || relaxesMana(it)) }
+    return if (shielded) null else limited.sourceId
+}
+
+/**
  * Find every active permission that authorizes [playerId] to play [cardId], with the gate
  * condition currently open. Multiple permissions can stack (e.g., a conditional grant and
  * an unconditional one); each read site picks how to combine them.

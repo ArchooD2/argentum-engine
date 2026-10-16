@@ -292,7 +292,7 @@ class TriggerProcessor(
                 // "artifact or enchantment with mana value X" — finds targets at legality time.
                 // Without it those predicates read an unbound X and match nothing.
                 xValue = trigger.triggerContext.xValue,
-                storedCollections = trigger.carriedPipeline?.storedCollections ?: emptyMap(),
+                storedCollections = triggerStoredCollections(trigger.triggerContext, trigger.carriedPipeline),
                 chosenValues = trigger.carriedPipeline?.chosenValues ?: emptyMap(),
                 storedStringLists = trigger.carriedPipeline?.storedStringLists ?: emptyMap(),
                 storedSubtypeGroups = trigger.carriedPipeline?.storedSubtypeGroups ?: emptyMap(),
@@ -366,7 +366,7 @@ class TriggerProcessor(
             triggeringEntityId = trigger.triggerContext.triggeringEntityId,
             triggeringPlayerId = trigger.triggerContext.triggeringPlayerId,
             xValue = trigger.triggerContext.xValue,
-            storedCollections = trigger.carriedPipeline?.storedCollections ?: emptyMap(),
+            storedCollections = triggerStoredCollections(trigger.triggerContext, trigger.carriedPipeline),
             chosenValues = trigger.carriedPipeline?.chosenValues ?: emptyMap(),
             storedStringLists = trigger.carriedPipeline?.storedStringLists ?: emptyMap(),
             storedSubtypeGroups = trigger.carriedPipeline?.storedSubtypeGroups ?: emptyMap(),
@@ -530,7 +530,7 @@ class TriggerProcessor(
                 triggeringEntityId = trigger.triggerContext.triggeringEntityId,
                 triggeringPlayerId = trigger.triggerContext.triggeringPlayerId,
                 triggerContext = trigger.triggerContext,
-                pipeline = trigger.carriedPipeline ?: com.wingedsheep.engine.handlers.PipelineState.EMPTY
+                pipeline = targetingPipeline(trigger)
             )
             ability.effect.runtimeDescription { amount -> evaluator.evaluateForDisplay(state, amount, context) }
         } catch (_: Exception) {
@@ -985,7 +985,7 @@ class TriggerProcessor(
             // Same reason as the pending-trigger call sites: an X-relative target filter must see
             // the X the ability went on the stack with, or it re-checks as having no legal targets.
             xValue = ability.xValue,
-            storedCollections = ability.carriedPipeline?.storedCollections ?: emptyMap(),
+            storedCollections = triggerStoredCollections(ability.triggerContext, ability.carriedPipeline),
             chosenValues = ability.carriedPipeline?.chosenValues ?: emptyMap(),
             storedStringLists = ability.carriedPipeline?.storedStringLists ?: emptyMap(),
             storedSubtypeGroups = ability.carriedPipeline?.storedSubtypeGroups ?: emptyMap(),
@@ -1250,6 +1250,14 @@ class TriggerProcessor(
      * is only the no-dynamic-cap default. [TargetOther] is unwrapped, snapshotted, and re-wrapped
      * so "another target" wording stays intact.
      */
+    /**
+     * The pipeline a pending trigger's target-time amounts read: a reflexive trigger's carried
+     * action-half state plus the batch the trigger captured ([triggerStoredCollections]).
+     */
+    private fun targetingPipeline(trigger: PendingTrigger): com.wingedsheep.engine.handlers.PipelineState =
+        (trigger.carriedPipeline ?: com.wingedsheep.engine.handlers.PipelineState.EMPTY)
+            .copy(storedCollections = triggerStoredCollections(trigger.triggerContext, trigger.carriedPipeline))
+
     private fun snapshotDynamicCount(
         state: GameState,
         trigger: PendingTrigger,
@@ -1277,8 +1285,10 @@ class TriggerProcessor(
                     // Without this the cap resolves to 0 and the player can pick no targets.
                     triggerContext = trigger.triggerContext,
                     // A reflexive trigger's dynamic cap may read what its action half stashed
-                    // (e.g. `VariableReference("discarded_count")`, Amass's army reference).
-                    pipeline = trigger.carriedPipeline ?: com.wingedsheep.engine.handlers.PipelineState.EMPTY,
+                    // (e.g. `VariableReference("discarded_count")`, Amass's army reference), and a
+                    // batch trigger's cap may count what it captured (The Wise Mothman's "up to X
+                    // target creatures, where X is the number of nonland cards milled this way").
+                    pipeline = targetingPipeline(trigger),
                 )
                 val bounds = DynamicTargetCount.bounds(requirement, trigger.triggerContext.xValue) { amount ->
                     amountEvaluator.evaluate(state, amount, context)
@@ -1327,7 +1337,7 @@ class TriggerProcessor(
                 triggeringPlayerId = trigger.triggerContext.triggeringPlayerId,
                 xValue = trigger.triggerContext.xValue,
                 triggerContext = trigger.triggerContext,
-                pipeline = trigger.carriedPipeline ?: com.wingedsheep.engine.handlers.PipelineState.EMPTY,
+                pipeline = targetingPipeline(trigger),
             )
             amountEvaluator.evaluate(state, dyn, context).coerceAtLeast(0)
         } catch (_: Exception) {

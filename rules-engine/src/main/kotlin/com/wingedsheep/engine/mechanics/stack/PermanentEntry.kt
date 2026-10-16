@@ -173,11 +173,15 @@ internal class PermanentEntry(
         // emit the CountersAddedEvent chapter detection reads, from every entry path (including the
         // as-enters-choice resumers, which is where a read-ahead Saga enters).
         if (cardDef != null && !spellComponent.castFaceDown && cardDef.isSaga) {
+            // A placement replacement can cut the entry lore counters to none — then nothing was
+            // put on it and there's no event.
             val loreCount = newState.getEntity(spellId)?.get<CountersComponent>()
-                ?.getCount(CounterType.LORE)?.takeIf { it > 0 } ?: 1
-            newState = com.wingedsheep.engine.handlers.effects.DamageUtils
-                .markCounterOnControlledPermanent(newState, spellId, CounterType.LORE, entering = true)
-            counterEvents.add(CountersAddedEvent(spellId, CounterType.LORE, loreCount, cardDef.name))
+                ?.getCount(CounterType.LORE) ?: 0
+            if (loreCount > 0) {
+                newState = com.wingedsheep.engine.handlers.effects.DamageUtils
+                    .markCounterOnControlledPermanent(newState, spellId, CounterType.LORE, entering = true)
+                counterEvents.add(CountersAddedEvent(spellId, CounterType.LORE, loreCount, cardDef.name))
+            }
         }
 
         newState = applyGlobalEntersTapped(newState, spellId, spellComponent, cardDef, controllerId)
@@ -508,9 +512,9 @@ internal class PermanentEntry(
                 ?.filterIsInstance<KeywordAbility.Impending>()
                 ?.firstOrNull()?.time ?: 0
             if (impendingTime > 0) {
-                val existingCounters = updated.get<CountersComponent>() ?: CountersComponent()
+                // The N time counters themselves are placed with the other entry counters
+                // (applyEntryCounterReplacements), so the placement replacements see them.
                 updated = updated
-                    .with(existingCounters.withAdded(CounterType.TIME, impendingTime))
                     .with(com.wingedsheep.engine.state.components.battlefield.CastForImpendingComponent)
             }
         }
@@ -719,7 +723,8 @@ internal class PermanentEntry(
                 com.wingedsheep.engine.handlers.effects.EntersWithReplacements.applyCastFromGraveyardRider(
                     newState, spellId, controllerId,
                     graveyardCastRider.entersWithCounter, graveyardCastRider.addedSubtype,
-                    graveyardCastRider.grantedAbility
+                    graveyardCastRider.grantedAbility,
+                    predicateEvaluator = conditionEvaluator.predicates
                 )
             newState = riderState
             counterEvents.addAll(riderEvents)
@@ -739,6 +744,23 @@ internal class PermanentEntry(
             )
             newState = boughtState
             counterEvents.addAll(boughtEvents)
+        }
+
+        // Impending (CR 702.176a): "If you chose to pay this permanent's impending cost, it enters
+        // with N time counters on it" — entry counters like any other (CR 122.6).
+        if (spellComponent.wasImpending && cardDef != null) {
+            val impendingTime = cardDef.keywordAbilities
+                .filterIsInstance<KeywordAbility.Impending>()
+                .firstOrNull()?.time ?: 0
+            if (impendingTime > 0) {
+                val (impendingState, impendingEvents) = EntersWithReplacements.placeEntryCounters(
+                    newState, spellId, CounterType.TIME, impendingTime,
+                    controllerId, cardComponent?.name ?: "",
+                    predicateEvaluator = conditionEvaluator.predicates
+                )
+                newState = impendingState
+                counterEvents.addAll(impendingEvents)
+            }
         }
 
         // Handle the intrinsic entry counters of a planeswalker (starting loyalty, CR 306.5b) or a
@@ -815,10 +837,16 @@ internal class PermanentEntry(
         if (cardDef != null && !spellComponent.castFaceDown && cardDef.isSaga) {
             val entering = newState.getEntity(spellId)
             val current = entering?.get<CountersComponent>() ?: CountersComponent()
-            // One lore counter (CR 714.3a), or the read-ahead chosen number (CR 714.3b)
-            val loreCount = entering?.let {
-                com.wingedsheep.engine.handlers.effects.ZoneMovementUtils.sagaEntryLoreCount(it)
-            } ?: 1
+            // One lore counter (CR 714.3a), or the read-ahead chosen number (CR 714.3b) — counters
+            // it's given as it enters, so the placement replacements apply (CR 122.6).
+            val loreCount = com.wingedsheep.engine.handlers.effects.ReplacementEffectUtils.applyCounterPlacementModifiers(
+                newState, spellId, CounterType.LORE,
+                entering?.let { com.wingedsheep.engine.handlers.effects.ZoneMovementUtils.sagaEntryLoreCount(it) } ?: 1,
+                // CR 122.6a — the entering permanent's controller puts the counters on it.
+                placerId = entering?.get<com.wingedsheep.engine.state.components.identity.ControllerComponent>()?.playerId
+                    ?: spellComponent.casterId,
+                predicateEvaluator = conditionEvaluator.predicates, byEffect = true
+            )
             val sagaComponent = SagaComponent(triggeredChapters = (1..loreCount).toSet())
             newState = newState.updateEntity(spellId) { c ->
                 c.with(sagaComponent)

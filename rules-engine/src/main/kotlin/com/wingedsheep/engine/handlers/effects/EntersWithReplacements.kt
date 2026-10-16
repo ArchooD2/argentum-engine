@@ -76,7 +76,7 @@ object EntersWithReplacements {
                 val counterType = com.wingedsheep.sdk.core.CounterType.PLUS_ONE_PLUS_ONE
                 val count = ReplacementEffectUtils.applyCounterPlacementModifiers(
                     state, entityId, counterType, 1, placerId = controllerId,
-                    predicateEvaluator = predicateEvaluator
+                    predicateEvaluator = predicateEvaluator, byEffect = true
                 )
                 // "If a creature entering the battlefield has riot but can't have a +1/+1 counter put
                 // onto it, it gains haste" (Rhythm of the Wild ruling, 2019-01-25).
@@ -328,7 +328,7 @@ object EntersWithReplacements {
         if (count <= 0 || !prospective.projectedState.canReceiveCounters(entityId)) return state to emptyList()
         val modifiedCount = ReplacementEffectUtils.applyCounterPlacementModifiers(
             prospective, entityId, counterType, count, placerId = controllerId,
-            predicateEvaluator = predicateEvaluator, replacementSourceState = replacementSourceState
+            predicateEvaluator = predicateEvaluator, replacementSourceState = replacementSourceState, byEffect = true
         )
         // A modifier can cut the placement to nothing; then no counter was put on it (no event).
         if (modifiedCount <= 0) return state to emptyList()
@@ -455,7 +455,7 @@ object EntersWithReplacements {
                         }
                         val modifiedCount = ReplacementEffectUtils.applyCounterPlacementModifiers(
                             newState, enteringEntityId, counterType, effect.count, placerId = enteringControllerId,
-                            predicateEvaluator = predicateEvaluator
+                            predicateEvaluator = predicateEvaluator, byEffect = true
                         )
                         val current = newState.getEntity(enteringEntityId)?.get<CountersComponent>() ?: CountersComponent()
                         newState = newState.updateEntity(enteringEntityId) { c ->
@@ -494,7 +494,7 @@ object EntersWithReplacements {
                             }
                             val modifiedCount = ReplacementEffectUtils.applyCounterPlacementModifiers(
                                 newState, enteringEntityId, counterType, count, placerId = enteringControllerId,
-                                predicateEvaluator = predicateEvaluator
+                                predicateEvaluator = predicateEvaluator, byEffect = true
                             )
                             val current = newState.getEntity(enteringEntityId)?.get<CountersComponent>() ?: CountersComponent()
                             newState = newState.updateEntity(enteringEntityId) { c ->
@@ -658,21 +658,19 @@ object EntersWithReplacements {
         controllerId: EntityId,
         counter: CounterType?,
         addedSubtype: String?,
-        grantedAbility: com.wingedsheep.sdk.scripting.TriggeredAbility? = null
+        grantedAbility: com.wingedsheep.sdk.scripting.TriggeredAbility? = null,
+        predicateEvaluator: PredicateEvaluator
     ): Pair<GameState, List<GameEvent>> {
         var newState = state
         val events = mutableListOf<GameEvent>()
         if (counter != null) {
+            // An entry counter like any other — the placement replacements see it (CR 122.6).
             val name = newState.getEntity(entityId)?.get<CardComponent>()?.name ?: ""
-            newState = newState.updateEntity(entityId) { c ->
-                val current = c.get<CountersComponent>() ?: CountersComponent()
-                c.with(current.withAdded(counter, 1))
-            }
-            val (afterMark, firstThisTurn, firstOfTypeThisTurn) = DamageUtils.recordCounterPlacement(
-                newState, entityId, counter, byController = true
+            val (placed, placedEvents) = placeEntryCounters(
+                newState, entityId, counter, 1, controllerId, name, predicateEvaluator
             )
-            newState = afterMark
-            events.add(CountersAddedEvent(entityId, counter, 1, name, firstThisTurn, firstOfTypeThisTurn = firstOfTypeThisTurn, placedBy = controllerId))
+            newState = placed
+            events.addAll(placedEvents)
         }
         // Gate on the entering permanent's *base* type — the projected state isn't recomputed yet at
         // this ETB point, so it wouldn't yet see the just-resolved permanent as a creature.

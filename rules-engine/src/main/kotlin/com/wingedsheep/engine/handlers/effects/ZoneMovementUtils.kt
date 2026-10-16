@@ -144,6 +144,7 @@ object ZoneMovementUtils {
     fun applySagaEntryIfNeeded(
         state: GameState,
         entityId: EntityId,
+        predicateEvaluator: PredicateEvaluator,
         counterTotals: MutableMap<CounterType, Int>? = null
     ): Pair<GameState, List<EngineGameEvent>> {
         val container = state.getEntity(entityId) ?: return state to emptyList()
@@ -154,16 +155,27 @@ object ZoneMovementUtils {
 
         val current = container.get<CountersComponent>() ?: CountersComponent()
         val loreCount = sagaEntryLoreCount(container)
-        val sagaComponent = SagaComponent(triggeredChapters = (1..loreCount).toSet())
         if (counterTotals != null) {
+            // The collected entry counters are placed (and modified) later, as one placement per
+            // kind; the chapters marked here follow the unmodified count.
+            val sagaComponent = SagaComponent(triggeredChapters = (1..loreCount).toSet())
             counterTotals[CounterType.LORE] = (counterTotals[CounterType.LORE] ?: 0) + loreCount
             return state.updateEntity(entityId) { it.with(sagaComponent) } to emptyList()
         }
+        // Counters it's given as it enters (CR 122.6): the placement replacements apply — the
+        // totals branch above gets them when the collected entry counters are placed.
+        val placed = ReplacementEffectUtils.applyCounterPlacementModifiers(
+            state, entityId, CounterType.LORE, loreCount,
+            placerId = state.projectedState.getController(entityId), predicateEvaluator = predicateEvaluator, byEffect = true
+        )
+        // The chapters the entry reaches follow what was actually put on it.
+        val sagaComponent = SagaComponent(triggeredChapters = (1..placed).toSet())
+        if (placed <= 0) return state.updateEntity(entityId) { it.with(sagaComponent) } to emptyList()
         val newState = state.updateEntity(entityId) { c ->
             c.with(sagaComponent)
-                .with(current.withAdded(CounterType.LORE, loreCount))
+                .with(current.withAdded(CounterType.LORE, placed))
         }.let { DamageUtils.markCounterOnControlledPermanent(it, entityId, CounterType.LORE, entering = true) }
-        return newState to listOf(CountersAddedEvent(entityId, CounterType.LORE, loreCount, cardComponent.name))
+        return newState to listOf(CountersAddedEvent(entityId, CounterType.LORE, placed, cardComponent.name))
     }
 
     /**

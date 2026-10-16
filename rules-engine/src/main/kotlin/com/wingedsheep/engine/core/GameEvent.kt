@@ -852,8 +852,9 @@ data class SpellCastEvent(
      * Mana value of the cast spell (CR 202.3), captured at cast time. Distinct from
      * [totalManaSpent] (actual mana paid, which can differ with cost reductions, alternative
      * costs, or X). Feeds `ContextPropertyKey.TRIGGERING_SPELL_MANA_VALUE` so payoffs that key
-     * off "a spell with equal or lesser mana value" (Kellan, the Kid) read the printed value of
-     * the spell that fired the trigger, not the mana spent on it.
+     * off "a spell with equal or lesser mana value" (Kellan, the Kid) read the mana value of the
+     * spell that fired the trigger — its {X} counted as the chosen X (CR 202.3e) — not the mana
+     * spent on it.
      */
     val manaValue: Int = 0,
     /**
@@ -975,7 +976,7 @@ data class SpellCopiedEvent(
     val originalSpellId: EntityId? = null,
     val copyIndex: Int? = null,
     val copyTotal: Int? = null,
-    /** The copy's mana value — the original's printed one (CR 707.10), read the same way as [SpellCastEvent.manaValue]. */
+    /** The copy's mana value — the original's (CR 707.10), its X included (CR 202.3e), read the same way as [SpellCastEvent.manaValue]. */
     val manaValue: Int = 0
 ) : GameEvent
 

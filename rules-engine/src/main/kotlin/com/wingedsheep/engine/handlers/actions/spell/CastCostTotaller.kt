@@ -492,6 +492,13 @@ internal class CastCostTotaller(
             } else null
         },
         // A card's own alternative cost (e.g., Zahid's {3}{U} + tap an artifact).
+        // A card's own priced cast-from-zone permission ("You may cast this card from your
+        // graveyard by paying {2}{W} rather than paying its mana cost", Raffine's Guidance).
+        AlternativeCostType.SELF_ZONE to {
+            zoneResolver.findMayCastSelfFromZoneAbility(state, playerId, cardId, action)
+                ?.alternativeManaCost
+                ?.let { priced(it) }
+        },
         AlternativeCostType.SELF_ALTERNATIVE to {
             cardDef.script.selfAlternativeCost?.let { priced(it.manaCost) }
         },

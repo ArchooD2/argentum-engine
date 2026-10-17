@@ -351,7 +351,6 @@ Families:
 - `BlightWasPaid` — Condition: "If this spell's blight additional cost was paid" Used for Lorwyn Eclipsed cards (e.g., Cinder Strike) where the effect changes based on whether the optional Blight additional cost was a…
 - `CastChoiceIs(slot: ChoiceSlot, value: String)` — Condition: the value locked in for slot equals value (compared as text).
 - `CastChoiceMade(slot: ChoiceSlot)` — Condition: a value was locked in for slot when the source was cast / as it entered.
-- `CastTimeFlagSet(flag: String)` — Condition: the named cast-time capture flag was true *as the source spell was cast* (CR 601.2i).
 - `CollectionContainsMatch(collection: String, filter: GameObjectFilter)` — Condition: "if a card in the named collection matches filter" Checks whether any entity in a stored pipeline collection matches the given filter.
 - `CollectionSharesCardType(collection: String)` — Condition: "if two cards in the named collection share a card type".
 - `ColorIsMostCommon(color: Color)` — Condition: "As long as color is the most common color among all permanents, or is tied for most common".
@@ -622,6 +621,7 @@ Families:
 - `DynamicAmount.Add(left: DynamicAmount, right: DynamicAmount)` — Add two dynamic amounts.
 - `DynamicAmount.AggregateBattlefield(player: Player, filter: GameObjectFilter, aggregation: Aggregation, property: CardNumericProperty?, excludeSelf: Boolean, counterType: CounterType?, excludeTriggeringEntity: Boolean)` — Generic battlefield aggregation primitive.
 - `DynamicAmount.AggregateZone(player: Player, zone: Zone, filter: GameObjectFilter, aggregation: Aggregation, property: CardNumericProperty?)` — Generic zone aggregation primitive.
+- `DynamicAmount.CapturedAtCast(captureName: String)` — A number frozen *as this spell was cast* (CR 601.2i) under captureName by the spell's `captureAtCast(name, amount)` declaration (com.wingedsheep.sdk.scripting.CastTimeCapture), read back at resolut…
 - `DynamicAmount.CardTypeEnteredUnderControlThisTurn(player: Player, cardType: CardType)` — The number of cardType permanents that entered the battlefield under player's control this turn — the card-type sibling of SubtypeEnteredUnderControlThisTurn over the same per-player entry log (Mal…
 - `DynamicAmount.CardsCycledThisGame(player: Player, cardName: String?)` — How many times a player has cycled a card this game — every cycling activation, typecycling included (CR 702.29f), counted when the card is discarded to pay the cost.
 - `DynamicAmount.CastChoice(slot: ChoiceSlot)` — A *numeric* value locked in for a com.wingedsheep.sdk.scripting.ChoiceSlot as this object was cast, read off the *current object* regardless of zone — the sibling of CastX for the other cast-choice…

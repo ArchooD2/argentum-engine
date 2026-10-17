@@ -1299,19 +1299,36 @@ class SpellBuilder(private val declaredTargets: TargetList = TargetList()) : Tar
     internal val restrictions: List<CastRestriction>
         get() = castRestrictions.toList()
 
-    // Cast-time condition captures ("as you cast this spell")
+    // Cast-time captures ("as you cast this spell")
     private val castTimeCaptureList: MutableList<CastTimeCapture> = mutableListOf()
 
     /**
      * Capture, *as this spell is cast* (CR 601.2i), whether [condition] holds, storing the answer
      * under [flag]. The spell's effect reads it back at resolution via
-     * `Conditions.CapturedAtCast(flag)` ([com.wingedsheep.sdk.scripting.conditions.CastTimeFlagSet]),
+     * `Conditions.CapturedAtCast(flag)` (a `Compare` over [DynamicAmount.CapturedAtCast]),
      * so the branch reflects the cast-time board even if it has since changed.
      *
      * Used for "if you controlled a Mount as you cast this spell" (Steer Clear).
      */
     fun captureAtCast(flag: String, condition: Condition) {
-        castTimeCaptureList.add(CastTimeCapture(flag, condition))
+        castTimeCaptureList.add(
+            CastTimeCapture(
+                flag,
+                DynamicAmount.Conditional(condition, DynamicAmount.Fixed(1), DynamicAmount.Fixed(0))
+            )
+        )
+    }
+
+    /**
+     * Capture, *as this spell is cast* (CR 601.2i), the value of [amount], storing it under [name].
+     * The spell's effect reads it back at resolution via `DynamicAmounts.capturedAtCast(name)`
+     * ([DynamicAmount.CapturedAtCast]), so the number reflects the cast-time board even if it has
+     * since changed.
+     *
+     * Used for "for each modified creature you controlled as you cast this spell" (Lethal Exploit).
+     */
+    fun captureAtCast(name: String, amount: DynamicAmount) {
+        castTimeCaptureList.add(CastTimeCapture(name, amount))
     }
 
     internal val castTimeCaptures: List<CastTimeCapture>

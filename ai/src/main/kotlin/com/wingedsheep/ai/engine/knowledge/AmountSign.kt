@@ -80,6 +80,8 @@ internal enum class AmountSign {
             is DynamicAmount.YourLifeTotal, is DynamicAmount.LifeTotal -> UNKNOWN
             // Opaque at analysis time: a pipeline variable or a trigger-context value could be anything.
             is DynamicAmount.VariableReference, is DynamicAmount.ContextProperty -> UNKNOWN
+            // A cast-time capture holds whatever amount the card froze, which can be negative.
+            is DynamicAmount.CapturedAtCast -> UNKNOWN
 
             // Counts, mana values, mana spent, X: none of them can go below zero.
             is DynamicAmount.Speed, is DynamicAmount.DungeonsCompleted, is DynamicAmount.PlayerCounterCount, is DynamicAmount.CardsCycledThisGame,

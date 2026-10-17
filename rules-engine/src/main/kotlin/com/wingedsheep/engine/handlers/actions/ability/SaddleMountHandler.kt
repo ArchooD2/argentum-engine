@@ -183,6 +183,12 @@ class SaddleMountHandler(
             )
         }
 
+        // ...and on the activator's per-turn memory of permanents whose abilities they activated
+        // (saddling a Mount is an activated ability of that permanent, so it counts as "first" too).
+        currentState = com.wingedsheep.engine.core.recordPermanentActivation(
+            currentState, action.playerId, com.wingedsheep.engine.core.activationSourceSnapshot(state, action.mountId)
+        )
+
         // Put the saddle ability on the stack: this permanent becomes saddled until end of turn.
         val abilityOnStack = ActivatedAbilityOnStackComponent(
             sourceId = action.mountId,

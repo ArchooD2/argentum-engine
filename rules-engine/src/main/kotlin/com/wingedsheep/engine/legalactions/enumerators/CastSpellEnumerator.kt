@@ -1,5 +1,6 @@
 package com.wingedsheep.engine.legalactions.enumerators
 
+import com.wingedsheep.engine.mechanics.cost.spell.AnyNumberForCostReductionCostKind
 import com.wingedsheep.engine.legalactions.surfacedRequirements
 import com.wingedsheep.engine.mechanics.cost.PlayerCounterPayment
 import com.wingedsheep.engine.handlers.PredicateEvaluator
@@ -283,10 +284,24 @@ class CastSpellEnumerator(
             // (CR 601.2f) — Spectral Denial's discounts raise its X ceiling.
             val xCredit = context.costCalculator.minPossibleXCredit(state, cardDef, playerId, cardId, effectiveCost)
 
-            // Apply maximum possible sacrifice cost reduction for affordability check
-            if (offer.variableSacrificeTargets.isNotEmpty() && offer.variableSacrificeReduction > 0) {
-                val maxReduction = offer.variableSacrificeTargets.size * offer.variableSacrificeReduction
+            // The largest "costs {N} less for each … this way" discount, for the affordability check.
+            // A candidate that is itself a counted mana source (a mana dork tapped or sacrificed for
+            // the discount) can't also make its mana, so it is worth N − 1 over the sources already
+            // counted, not N. What the printed generic can't absorb pays the announced X instead
+            // (CR 601.2f), so it raises the X ceiling below — a March with two white cards to exile
+            // reaches X + 4.
+            val reducingCost = offer.reducingCost
+            var reducingXCredit = 0
+            if (reducingCost != null && offer.reducingCandidates.isNotEmpty()) {
+                val manaSourceIds = context.availableManaSources.mapTo(HashSet()) { it.entityId }
+                val sourceCandidates = offer.reducingCandidates.count { it in manaSourceIds }
+                val maxReduction = (offer.reducingCandidates.size - sourceCandidates) * reducingCost.reductionPerUnit +
+                    sourceCandidates * (reducingCost.reductionPerUnit - 1).coerceAtLeast(0)
+                val genericBefore = effectiveCost.genericAmount
                 effectiveCost = effectiveCost.reduceGeneric(maxReduction)
+                if (effectiveCost.hasX) {
+                    reducingXCredit = maxReduction - (genericBefore - effectiveCost.genericAmount)
+                }
             }
 
             // Save base cost for blight path, then add extra mana for the "pay" path
@@ -628,7 +643,7 @@ class CastSpellEnumerator(
                 } else 0
                 val fixedCost = effectiveCost.cmc  // X contributes 0 to CMC
                 val xSymbolCount = effectiveCost.xCount.coerceAtLeast(1)
-                ((availableSources + delveAvailable + waterbendAvailable + convokeAvailable + improviseAvailable + xCredit - fixedCost) / xSymbolCount)
+                ((availableSources + delveAvailable + waterbendAvailable + convokeAvailable + improviseAvailable + xCredit + reducingXCredit - fixedCost) / xSymbolCount)
                     .coerceAtLeast(0)
             } else null
 
@@ -2671,14 +2686,9 @@ class CastSpellEnumerator(
         // Every selection cost the spell carries is offered — "discard a card and sacrifice a
         // creature" asks for both (CR 601.2h). The first leads; the rest ride in `alsoRequired`.
         val selections = buildList {
-            if (offer.variableSacrificeTargets.isNotEmpty()) {
-                val varSacCost = additionalCosts.filterIsInstance<AdditionalCost.SacrificeCreaturesForCostReduction>().firstOrNull()
-                add(AdditionalCostData(
-                    description = varSacCost?.description ?: "You may sacrifice any number of creatures",
-                    costType = "SacrificeForCostReduction",
-                    validSacrificeTargets = offer.variableSacrificeTargets,
-                    sacrificeCount = 0 // min 0 — sacrifice is optional
-                ))
+            val reducingCost = offer.reducingCost
+            if (reducingCost != null && offer.reducingCandidates.isNotEmpty()) {
+                add(AnyNumberForCostReductionCostKind.data(reducingCost, offer.reducingCandidates))
             }
             if (offer.sacrificeTargets.isNotEmpty()) {
                 val sacCost = additionalCosts.firstNotNullOfOrNull { (it as? AdditionalCost.Atom)?.atom as? CostAtom.Sacrifice }

@@ -819,11 +819,33 @@ object Costs {
             fromZone: CostZone = CostZone.GRAVEYARD
         ): AdditionalCost = AdditionalCost.ExileVariableCards(minCount, filter, fromZone)
 
-        /** Sacrifice any number of [filter] permanents, each reducing generic cost by [costReductionPerCreature]. */
-        fun SacrificeCreaturesForCostReduction(
-            filter: GameObjectFilter = GameObjectFilter.Creature,
-            costReductionPerCreature: Int = 2
-        ): AdditionalCost = AdditionalCost.SacrificeCreaturesForCostReduction(filter, costReductionPerCreature)
+        /**
+         * "You may sacrifice any number of [filter]. This spell costs {[reductionPerUnit]} less to cast
+         * for each … sacrificed this way" (Torgaar, Famine Incarnate).
+         */
+        fun SacrificeAnyNumberForCostReduction(
+            filter: GameObjectFilter,
+            reductionPerUnit: Int
+        ): AdditionalCost = AdditionalCost.AnyNumberForCostReduction(PermanentCostAction.SACRIFICE, filter, reductionPerUnit)
+
+        /**
+         * "You may tap any number of untapped [filter] you control. This spell costs {[reductionPerUnit]}
+         * less to cast for each … tapped this way" (Explosive Singularity).
+         */
+        fun TapAnyNumberForCostReduction(
+            filter: GameObjectFilter,
+            reductionPerUnit: Int
+        ): AdditionalCost = AdditionalCost.AnyNumberForCostReduction(PermanentCostAction.TAP, filter, reductionPerUnit)
+
+        /**
+         * "You may exile any number of [filter] cards from your hand. This spell costs
+         * {[reductionPerUnit]} less to cast for each card exiled this way" (the NEO March cycle).
+         */
+        fun ExileAnyNumberFromHandForCostReduction(
+            filter: GameObjectFilter,
+            reductionPerUnit: Int
+        ): AdditionalCost =
+            AdditionalCost.AnyNumberForCostReduction(PermanentCostAction.EXILE, filter, reductionPerUnit, CostZone.HAND)
 
         /** Forage (exile three cards from your graveyard or sacrifice a Food). */
         val Forage: AdditionalCost = AdditionalCost.Forage

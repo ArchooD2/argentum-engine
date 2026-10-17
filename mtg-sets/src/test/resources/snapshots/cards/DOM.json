@@ -13159,7 +13159,12 @@
             }
         ],
         "additionalCosts": [
-            "SacrificeCreaturesForCostReduction"
+            {
+                "type": "AnyNumberForCostReduction",
+                "action": "SACRIFICE",
+                "filter": "creature",
+                "reductionPerUnit": 2
+            }
         ]
     },
     "metadata": {

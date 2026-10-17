@@ -4,6 +4,7 @@ import com.wingedsheep.sdk.core.CounterType
 import com.wingedsheep.sdk.core.Zone
 import com.wingedsheep.sdk.model.EntityId
 import com.wingedsheep.sdk.scripting.costs.CostAtom
+import com.wingedsheep.sdk.scripting.costs.PermanentCostAction
 import com.wingedsheep.sdk.scripting.text.TextReplaceable
 import com.wingedsheep.sdk.scripting.text.TextReplacer
 import kotlinx.serialization.SerialName
@@ -109,20 +110,66 @@ sealed interface AdditionalCost : TextReplaceable<AdditionalCost> {
     }
 
     /**
-     * Sacrifice any number of permanents matching the given filter as an additional cost.
-     * Each sacrifice reduces the spell's generic mana cost by [costReductionPerCreature].
-     * Example: "You may sacrifice any number of creatures. This spell costs {2} less for each creature sacrificed."
+     * "As an additional cost to cast this spell, you may <action> any number of <filter>. This spell
+     * costs {N} less to cast for each <one> <action>ed this way." The caster chooses how many (zero
+     * included), and each one takes [reductionPerUnit] generic mana off the total cost (CR 601.2f —
+     * the announced X is generic mana in that total, so the discount keeps paying into an {X}).
      *
-     * @property filter Which permanents can be sacrificed
-     * @property costReductionPerCreature Generic mana reduction per sacrificed creature
+     *  - `SACRIFICE` — permanents you control (Torgaar, Famine Incarnate; Rottenmouth Viper).
+     *  - `TAP` — untapped permanents you control; a cost, not the {T} symbol, so summoning sickness
+     *    doesn't matter (Explosive Singularity).
+     *  - `EXILE` with [fromZone] `HAND` — cards in your hand other than the spell itself (the
+     *    Kamigawa: Neon Dynasty March cycle). Exiling permanents for a discount isn't printed, so
+     *    `EXILE` is hand-only for now.
+     *
+     * Closest neighbours: [CostAtom.VariablePermanents] (a variable-count cost whose count becomes
+     * the ability's X, never a discount, and battlefield-only) and [ExileVariableCards] (the count is
+     * the spell's X). Here the count is a *price*, not a value the effect reads.
+     *
+     * @property action what is done with each chosen object.
+     * @property filter which objects may be chosen.
+     * @property reductionPerUnit generic mana taken off per object chosen.
+     * @property fromZone where the chosen objects are: `BATTLEFIELD`, or `HAND` for `EXILE`.
      */
-    @SerialName("SacrificeCreaturesForCostReduction")
+    @SerialName("AnyNumberForCostReduction")
     @Serializable
-    data class SacrificeCreaturesForCostReduction(
-        val filter: GameObjectFilter = GameObjectFilter.Creature,
-        val costReductionPerCreature: Int = 2
+    data class AnyNumberForCostReduction(
+        val action: PermanentCostAction,
+        val filter: GameObjectFilter,
+        val reductionPerUnit: Int,
+        val fromZone: CostZone = CostZone.BATTLEFIELD
     ) : AdditionalCost {
-        override val description: String = "You may sacrifice any number of creatures. This spell costs {$costReductionPerCreature} less to cast for each creature sacrificed this way."
+        init {
+            require(
+                if (action == PermanentCostAction.EXILE) fromZone == CostZone.HAND else fromZone == CostZone.BATTLEFIELD
+            ) { "AnyNumberForCostReduction: $action from $fromZone is not supported" }
+        }
+
+        override val description: String get() =
+            "You may ${choice.replaceFirstChar { it.lowercase() }}. This spell costs {$reductionPerUnit} " +
+                "less to cast for each ${if (fromZone == CostZone.HAND) "card" else singular()} " +
+                "${when (action) {
+                    PermanentCostAction.SACRIFICE -> "sacrificed"
+                    PermanentCostAction.TAP -> "tapped"
+                    PermanentCostAction.EXILE -> "exiled"
+                }} this way."
+
+        /** The choice on its own — "Tap any number of untapped creatures you control" — for a picker prompt. */
+        val choice: String get() = when (action) {
+            PermanentCostAction.SACRIFICE -> "Sacrifice any number of ${plural()}"
+            PermanentCostAction.TAP -> "Tap any number of untapped ${plural()} you control"
+            PermanentCostAction.EXILE -> "Exile any number of ${cardsNoun()} from your hand"
+        }
+
+        private fun singular(): String = filter.copy(controllerPredicate = null).description
+
+        private fun plural(): String = com.wingedsheep.sdk.scripting.util.pluralNounPhrase(singular())
+
+        // A colour-only filter describes itself as "white"; a hand pick is always of cards.
+        private fun cardsNoun(): String = filter.description.let {
+            if (it.endsWith("card")) com.wingedsheep.sdk.scripting.util.pluralNounPhrase(it) else "$it cards"
+        }
+
         override fun applyTextReplacement(replacer: TextReplacer): AdditionalCost {
             val newFilter = filter.applyTextReplacement(replacer)
             return if (newFilter !== filter) copy(filter = newFilter) else this
@@ -609,3 +656,4 @@ data class DistributedCounterRemoval(
     val counterType: String,
     val count: Int
 )
+

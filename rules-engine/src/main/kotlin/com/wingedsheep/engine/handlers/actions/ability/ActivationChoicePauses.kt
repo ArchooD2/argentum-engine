@@ -40,6 +40,7 @@ import com.wingedsheep.sdk.model.EntityId
 import com.wingedsheep.sdk.scripting.AbilityCost
 import com.wingedsheep.sdk.scripting.targets.TargetChooser
 import com.wingedsheep.sdk.scripting.targets.TargetRequirement
+import com.wingedsheep.sdk.scripting.util.quantify
 
 /**
  * The announcement-time choices an activation may have to stop and ask for before any cost is paid
@@ -485,15 +486,29 @@ internal class ActivationChoicePauses(
                 sourceId = action.sourceId,
             )
             .let { if (variablePermanentsCost.excludeSelf) it.filter { id -> id != action.sourceId } else it }
+            // A single-permanent cost announces X by its pick: offer only picks that leave a target.
+            .let {
+                VariablePermanentsCost.viableSinglePicks(
+                    state, variablePermanentsCost, it, activation.targetRequirements,
+                    action.playerId, action.sourceId, targetFinder
+                )
+            }
         val minCount = variablePermanentsCost.minCount
+        val maxCount = variablePermanentsCost.maxCount
         if (candidates.size < minCount) {
-            return ExecutionResult.error(state, "Not enough permanents to $verb for ${sourceName}")
+            return ExecutionResult.error(
+                state,
+                if (maxCount == 1) "No ${variablePermanentsCost.filter.description} to $verb leaves a legal target for ${sourceName}"
+                else "Not enough permanents to $verb for ${sourceName}"
+            )
         }
-        val prompt = "Choose one or more ${variablePermanentsCost.filter.description}s to $verb for ${sourceName}"
+        val prompt = if (maxCount == 1) "Choose ${quantify(1, variablePermanentsCost.filter.description)} to $verb for ${sourceName}"
+            else "Choose one or more ${variablePermanentsCost.filter.description}s to $verb for ${sourceName}"
         val continuation = ActivateAbilityVariablePermanentsContinuation(
             action = action,
             candidates = candidates,
-            minCount = minCount
+            minCount = minCount,
+            maxCount = maxCount
         )
         return state.suspendForDecision(
             question = { decisionId ->
@@ -504,7 +519,7 @@ internal class ActivationChoicePauses(
                     context = castingContext(action, sourceName),
                     options = candidates,
                     minSelections = minCount,
-                    maxSelections = candidates.size
+                    maxSelections = maxCount?.coerceAtMost(candidates.size) ?: candidates.size
                 )
             },
             answer = continuation

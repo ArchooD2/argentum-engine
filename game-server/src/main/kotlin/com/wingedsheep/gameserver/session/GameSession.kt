@@ -232,6 +232,14 @@ class GameSession(
     var attackMode: com.wingedsheep.sdk.core.AttackMode = com.wingedsheep.sdk.core.AttackMode.MULTIPLE
 
     /**
+     * Whether this game is played for ante (CR 407). Set by the lobby handler before [startGame]
+     * and forwarded to [GameConfig.playingForAnte]; never true for ranked games. Recorded in the
+     * [com.wingedsheep.gameserver.replay.ReplaySetup] because anteing consumes RNG.
+     */
+    @Volatile
+    var playingForAnte: Boolean = false
+
+    /**
      * Team partitioning for team variants (Two-Headed Giant — CR 810), as lists of seat indices
      * into the join/turn order; each entry is one team. Set by the lobby / scenario handler before
      * [startGame] and forwarded to [GameConfig.teams], which stamps [TeamComponent] on each player.
@@ -705,6 +713,7 @@ class GameSession(
             useHandSmoother = useHandSmoother,
             format = engineFormat,
             attackMode = attackMode,
+            playingForAnte = playingForAnte,
             // Team partitioning for Two-Headed Giant (CR 810); null for non-team games. The seat
             // indices line up with playerConfigs, which preserves the join/turn order of `players`.
             teams = teams,
@@ -722,6 +731,7 @@ class GameSession(
             preserveGraveyardOrder = result.state.preserveGraveyardOrder,
             format = engineFormat,
             attackMode = attackMode,
+            playingForAnte = config.playingForAnte,
             startingHandSize = config.startingHandSize,
             skipMulligans = config.skipMulligans,
             useHandSmoother = config.useHandSmoother,

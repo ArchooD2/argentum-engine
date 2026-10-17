@@ -74,6 +74,13 @@ export interface ClientGameState {
   readonly attackMode?: AttackMode | null
 
   /**
+   * True when this game is played for ante (CR 407): each player's ante zone is shown on the board
+   * and the "Playing for ante" indicator is up. Absent means false. Fixed for the whole game, so a
+   * delta never carries it — the applicator keeps the full state's value.
+   */
+  readonly playingForAnte?: boolean
+
+  /**
    * Set while this state is a Magic subgame (Shahrazad, CR 729): the board, zones and life totals
    * are the subgame's. Describes the games waiting on it, outermost first. Absent in an ordinary
    * game.

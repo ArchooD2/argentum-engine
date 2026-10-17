@@ -97,6 +97,7 @@ export function applyStateDelta(
     subgame: delta.subgameCleared ? null : (delta.subgame ?? current.subgame ?? null),
     // Fixed for the whole game, so only the full state carries it.
     attackMode: current.attackMode ?? null,
+    playingForAnte: current.playingForAnte ?? false,
     voidActive: delta.voidActive ?? current.voidActive ?? false,
     combat,
     gameLog,

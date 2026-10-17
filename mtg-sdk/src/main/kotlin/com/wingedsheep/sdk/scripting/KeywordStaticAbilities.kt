@@ -15,8 +15,9 @@ import kotlinx.serialization.Serializable
  * attached creature, [GroupFilter.source] for "this creature has flying", or any
  * battlefield-scoped filter for lord effects ("Other creatures you control have flying").
  *
- * The [keyword] field stores the enum name (e.g., "FLYING", "DOESNT_UNTAP") which the
- * engine uses for string-based keyword checks in projected state.
+ * The [keyword] field stores the `Keyword`/`AbilityFlag` enum name (e.g., "FLYING", "DOESNT_UNTAP"),
+ * or a parameterized keyword's projected string (`KeywordAbility.BandsWithOther.projectedKeyword`),
+ * which the engine uses for string-based keyword checks in projected state.
  */
 @SerialName("GrantKeyword")
 @Serializable
@@ -26,6 +27,14 @@ data class GrantKeyword(
 ) : StaticAbility {
     constructor(keyword: Keyword, filter: GroupFilter = GroupFilter.attachedCreature()) :
         this(keyword.name, filter)
+
+    /**
+     * Grant a "bands with other [quality]" ability (CR 702.22b) — "White legendary creatures you
+     * control have 'bands with other legendary creatures'" (Cathedral of Serra), or a token's own
+     * "It has 'bands with other creatures named Wolves of the Hunt'" with [GroupFilter.source].
+     */
+    constructor(ability: KeywordAbility.BandsWithOther, filter: GroupFilter = GroupFilter.attachedCreature()) :
+        this(ability.projectedKeyword, filter)
 
     override val description: String =
         "${filter.description} have ${com.wingedsheep.sdk.scripting.util.keywordDisplayText(keyword)}"

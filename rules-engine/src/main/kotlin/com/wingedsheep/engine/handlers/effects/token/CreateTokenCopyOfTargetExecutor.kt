@@ -129,7 +129,10 @@ class CreateTokenCopyOfTargetExecutor(
                     // carries "your next end step" and "unless it's your Ring-bearer".
                     val created = substituteExecutor.createSubstituteTokens(
                         state, lookup, context, tokenCount, controllerId,
-                        riders = TokenRiders(tapped = effect.tapped, attacking = effect.attacking),
+                        riders = TokenRiders(
+                            tapped = effect.tapped, attacking = effect.attacking,
+                            attackDefender = effect.attackDefender,
+                        ),
                         rootEffect = effect
                     )
                     if (created.outcome !is com.wingedsheep.engine.core.Outcome.Done) created
@@ -341,6 +344,16 @@ class CreateTokenCopyOfTargetExecutor(
             .copy(ownerId = controllerId, isDoubleFaced = false)
 
         val cappedCount = com.wingedsheep.engine.core.GameLimits.cappedTokenCount(count, "target-copy tokens")
+        // CR 508.4: "its controller chooses ... as it enters" — every copy's defender is settled
+        // before the first one is created, one question per token. The answers re-run the whole
+        // effect from the top (EnteringAttackDefenderContinuation), so an Aura copy — whose host
+        // continuation re-enters here directly — keeps the default.
+        val chosenDefenders = if (effect.attacking && tokenCard.typeLine.isCreature && auraHostId == null &&
+            effect.attackDefender == com.wingedsheep.sdk.scripting.effects.EnteringAttackDefender.CONTROLLER_CHOOSES
+        ) {
+            EnteringAttackDefenderChooser.defenders(state, context, controllerId, cappedCount)
+                ?: return EnteringAttackDefenderChooser.pause(state, effect, context, controllerId, cappedCount, tokenCard.name)
+        } else null
         for (index in 0 until cappedCount) {
             val stateBeforeToken = newState
             val (tokenId, stateWithId) = newState.newEntity()
@@ -373,7 +386,9 @@ class CreateTokenCopyOfTargetExecutor(
                 // it is still in the game and one of the creator's opponents; otherwise the copy
                 // enters but never attacking (CR 508.4a). Unspecified, the token joins the
                 // source's attack (CR 802.2a) — see CreateTokenExecutor.
-                val defenderId = if (effect.attackedPlayer != null) {
+                val defenderId = if (chosenDefenders != null) {
+                    chosenDefenders[index]
+                } else if (effect.attackedPlayer != null) {
                     com.wingedsheep.engine.handlers.effects.TargetResolutionUtils
                         .resolvePlayerTarget(effect.attackedPlayer!!, context, newState)
                         ?.takeIf { it in newState.getOpponents(controllerId) }

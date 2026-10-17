@@ -132,9 +132,13 @@ class IntimidateRule : BlockEvasionRule {
 }
 
 /**
- * Landwalk: Cannot be blocked if defending player controls land of that type.
+ * Landwalk (CR 702.14): cannot be blocked if the defending player controls a land of that type —
+ * unless a [com.wingedsheep.sdk.scripting.SuppressLandwalkForGroup] lets the attacker be blocked
+ * as though it didn't have that landwalk ([LandwalkSuppression]).
  */
-class LandwalkRule : BlockEvasionRule {
+class LandwalkRule(
+    private val predicateEvaluator: PredicateEvaluator
+) : BlockEvasionRule {
     private val landwalkToSubtype = mapOf(
         Keyword.FORESTWALK to Subtype.FOREST,
         Keyword.SWAMPWALK to Subtype.SWAMP,
@@ -145,20 +149,26 @@ class LandwalkRule : BlockEvasionRule {
     )
 
     override fun check(ctx: BlockCheckContext): String? {
-        val attackerName = ctx.state.getEntity(ctx.attackerId)?.get<CardComponent>()?.name ?: "Creature"
+        // The suppression scan runs only once a landwalk would actually apply.
+        val suppressed by lazy(LazyThreadSafetyMode.NONE) {
+            LandwalkSuppression.suppressedLandwalks(ctx.state, ctx.attackerId, ctx.cardRegistry, predicateEvaluator)
+        }
+        val attackerName = { ctx.state.getEntity(ctx.attackerId)?.get<CardComponent>()?.name ?: "Creature" }
         for ((landwalkKeyword, landSubtype) in landwalkToSubtype) {
-            if (ctx.projected.hasKeyword(ctx.attackerId, landwalkKeyword)) {
-                if (playerControlsLandWithSubtype(ctx, landSubtype)) {
-                    return "$attackerName has ${landwalkKeyword.displayName} and cannot be blocked"
-                }
+            if (ctx.projected.hasKeyword(ctx.attackerId, landwalkKeyword) &&
+                playerControlsLandWithSubtype(ctx, landSubtype) &&
+                landwalkKeyword !in suppressed
+            ) {
+                return "${attackerName()} has ${landwalkKeyword.displayName} and cannot be blocked"
             }
         }
         // Nonbasic landwalk (CR 702.14 family): unblockable while the defending player controls any
         // land that isn't a basic land.
         if (ctx.projected.hasKeyword(ctx.attackerId, Keyword.NONBASIC_LANDWALK) &&
-            playerControlsNonbasicLand(ctx)
+            playerControlsNonbasicLand(ctx) &&
+            Keyword.NONBASIC_LANDWALK !in suppressed
         ) {
-            return "$attackerName has ${Keyword.NONBASIC_LANDWALK.displayName} and cannot be blocked"
+            return "${attackerName()} has ${Keyword.NONBASIC_LANDWALK.displayName} and cannot be blocked"
         }
         return null
     }
@@ -756,7 +766,7 @@ fun defaultBlockEvasionRules(
     ShadowRule(),
     FearRule(),
     IntimidateRule(),
-    LandwalkRule(),
+    LandwalkRule(predicateEvaluator),
     CantBeBlockedByRule(predicateEvaluator),
     CantBlockSpecificAttackerRule(),
     CantBeBlockedExceptByColorRule(),

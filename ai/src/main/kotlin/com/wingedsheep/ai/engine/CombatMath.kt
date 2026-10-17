@@ -13,6 +13,7 @@ import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.model.EntityId
 import com.wingedsheep.engine.handlers.PredicateContext
 import com.wingedsheep.engine.handlers.PredicateEvaluator
+import com.wingedsheep.engine.mechanics.combat.rules.LandwalkSuppression
 import com.wingedsheep.sdk.scripting.CantBeBlockedBy
 import com.wingedsheep.sdk.scripting.CantBlockCreaturesWithGreaterPower
 
@@ -100,11 +101,19 @@ object CombatMath {
         val blockerController = projected.getController(blocker)
         if (blockerController != null) {
             val defenderLands = projected.getBattlefieldControlledBy(blockerController)
-            if (Keyword.SWAMPWALK.name in aKeywords && defenderLands.any { projected.hasSubtype(it, "Swamp") }) return false
-            if (Keyword.FORESTWALK.name in aKeywords && defenderLands.any { projected.hasSubtype(it, "Forest") }) return false
-            if (Keyword.ISLANDWALK.name in aKeywords && defenderLands.any { projected.hasSubtype(it, "Island") }) return false
-            if (Keyword.MOUNTAINWALK.name in aKeywords && defenderLands.any { projected.hasSubtype(it, "Mountain") }) return false
-            if (Keyword.PLAINSWALK.name in aKeywords && defenderLands.any { projected.hasSubtype(it, "Plains") }) return false
+            // "Can be blocked as though it didn't have <X>walk" (Quagmire) — same reader as the
+            // engine, consulted only once a landwalk would otherwise apply.
+            val suppressed by lazy(LazyThreadSafetyMode.NONE) {
+                if (cardRegistry == null) emptySet()
+                else LandwalkSuppression.suppressedLandwalks(state, attacker, cardRegistry, PredicateEvaluator(cardRegistry))
+            }
+            fun walks(keyword: Keyword, land: String) =
+                keyword.name in aKeywords && defenderLands.any { projected.hasSubtype(it, land) } && keyword !in suppressed
+            if (walks(Keyword.SWAMPWALK, "Swamp")) return false
+            if (walks(Keyword.FORESTWALK, "Forest")) return false
+            if (walks(Keyword.ISLANDWALK, "Island")) return false
+            if (walks(Keyword.MOUNTAINWALK, "Mountain")) return false
+            if (walks(Keyword.PLAINSWALK, "Plains")) return false
         }
 
         // Attacker-side filter restrictions (e.g., "can't be blocked by creatures with power 2 or less")

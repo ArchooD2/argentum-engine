@@ -759,11 +759,8 @@ class TurnManager(
                 events.addAll(drawResult.events)
                 // Check state-based actions after draw (Rule 704.3)
                 val sbaResult = sbaChecker.checkAndApply(newState)
-                if (sbaResult.outcome is Outcome.Paused) {
-                    return ExecutionResult.propagatePause(
-                        sbaResult.state,
-                        events + sbaResult.events
-                    )
+                if (sbaResult.outcome !is Outcome.Done) {
+                    return sbaResult.copy(events = events + sbaResult.events)
                 }
                 newState = sbaResult.newState
                 events.addAll(sbaResult.events)
@@ -859,7 +856,7 @@ class TurnManager(
                 newState = damageResult.newState
                 events.addAll(damageResult.events)
                 val sbaHelperResult = StepActionHelper.applySbasAndCheckGameOver(newState, activePlayer, sbaChecker, events)
-                if (sbaHelperResult.outcome is Outcome.Paused) return sbaHelperResult
+                if (sbaHelperResult.outcome !is Outcome.Done) return sbaHelperResult
                 newState = sbaHelperResult.newState
                 // events already updated by helper
                 if (!newState.gameOver) {
@@ -881,7 +878,7 @@ class TurnManager(
                 newState = damageResult.newState
                 events.addAll(damageResult.events)
                 val sbaHelperResult = StepActionHelper.applySbasAndCheckGameOver(newState, activePlayer, sbaChecker, events)
-                if (sbaHelperResult.outcome is Outcome.Paused) return sbaHelperResult
+                if (sbaHelperResult.outcome !is Outcome.Done) return sbaHelperResult
                 newState = sbaHelperResult.newState
                 if (!newState.gameOver) {
                     newState = newState.withPriority(activePlayer)
@@ -938,11 +935,8 @@ class TurnManager(
                         }
                         events.add(PlayerLostEvent(member, GameEndReason.CARD_EFFECT, loseComponent.message))
                         val sbaResult = sbaChecker.checkAndApply(newState)
-                        if (sbaResult.outcome is Outcome.Paused) {
-                            return ExecutionResult.propagatePause(
-                                sbaResult.state,
-                                events + sbaResult.events
-                            )
+                        if (sbaResult.outcome !is Outcome.Done) {
+                            return sbaResult.copy(events = events + sbaResult.events)
                         }
                         newState = sbaResult.newState
                         events.addAll(sbaResult.events)
@@ -1330,8 +1324,8 @@ class TurnManager(
         // CR 724.1c: state-based actions are checked. (Creatures destroyed by a preceding board
         // wipe are already handled by that effect; this catches any other pending SBA.)
         val sbaResult = sbaChecker.checkAndApply(newState)
-        if (sbaResult.outcome is Outcome.Paused) {
-            return ExecutionResult.propagatePause(sbaResult.newState, events + sbaResult.events)
+        if (sbaResult.outcome !is Outcome.Done) {
+            return sbaResult.copy(events = events + sbaResult.events)
         }
         newState = sbaResult.newState
         events.addAll(sbaResult.events)

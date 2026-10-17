@@ -25,14 +25,13 @@
   ],
   "reasons": {
     "ante": "Playing for ante is supported, but this card's ante effect isn't implemented yet.",
-    "dexterity": "Requires physical dexterity with a real card, which has no digital equivalent."
+    "dexterity": "Requires physical dexterity with a real card that the table-flip mini-game (built for Chaos Orb) doesn't cover yet."
   },
   "cards": [
     { "name": "Amulet of Quoz", "reason": "ante" },
     { "name": "Rebirth", "reason": "ante" },
     { "name": "Tempest Efreet", "reason": "ante" },
     { "name": "Timmerian Fiends", "reason": "ante" },
-    { "name": "Chaos Orb", "reason": "dexterity" },
     { "name": "Falling Star", "reason": "dexterity" }
   ]
 }

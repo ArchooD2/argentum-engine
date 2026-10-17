@@ -1057,6 +1057,24 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     related: ['game-table', 'card-badges'],
   },
   {
+    id: 'dexterity-flips',
+    section: 'playing',
+    title: 'Flipping Chaos Orb',
+    summary:
+      'Chaos Orb is played for real: the battlefield is laid out as a card table, you aim, press and hold to swing, and let go with the needle on the gold line. Your aim and your timing decide what it destroys.',
+    body: [
+      { kind: 'p', text: 'When Chaos Orb’s ability resolves, a table opens with every permanent lying where it would on a paper battlefield — creatures in front, lands at the back, tapped cards sideways, Auras and Equipment peeking out from behind what they’re attached to. Your side is at the bottom; the Orb sits in your hand at the edge.' },
+      { kind: 'ol', items: [
+        'Aim — move over the table. The crosshair is your aim and the dashed card shows where a perfect release lands; anything under it lights up red, your own permanents amber, and tokens grey (Chaos Orb can’t destroy tokens). A clean flip lands within a few millimetres of your aim, so aim carefully.',
+        'Swing — press and hold. The swing starts the moment you press, so aim first. The needle swings up and down the gauge, and the dashed card slides with it: below the gold line the Orb falls short, back towards your own permanents; above it, it sails long. Your hand also sways left and right — the dot under the Orb — pulling the flip to that side, so let go with it centred. Every swing is quicker than the last, and hold too long and your hand starts to shake.',
+        'Let go — release with the needle on the gold line to land on your aim. Let go far too low and the Orb won’t turn over completely, which means it does nothing.',
+      ] },
+      { kind: 'p', text: 'The server decides where it lands from your aim and release, so every player sees the same flight. Everything the Orb touches is destroyed if it turned over — yours included — and then the Orb itself is destroyed. Your opponent watches the same flip from their side of the table.' },
+      { kind: 'tip', text: 'Aim at the seam between two cards to take both — a precise aim and a clean release can. Your first swing is the slowest, so it’s usually the one to take. Space works as the swing button too, and Esc stops a swing without throwing.' },
+    ],
+    related: ['decisions', 'game-table'],
+  },
+  {
     id: 'emotes',
     section: 'playing',
     title: 'Emotes',
@@ -1215,7 +1233,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
       { kind: 'p', text: 'A strip above each prompt names the cards involved — the source, its target, what triggered it — so a long chain of triggers stays readable.' },
       { kind: 'p', text: 'Secret choices stay private until everyone has confirmed. Pick a number in the prompt, or click a highlighted creature to vote for it; Select None submits an optional ballot without a vote. The game log reveals everyone’s choices together after the last answer.' },
     ],
-    related: ['targeting-and-combat', 'yields', 'mana-payment'],
+    related: ['targeting-and-combat', 'yields', 'mana-payment', 'dexterity-flips'],
   },
   {
     id: 'yields',

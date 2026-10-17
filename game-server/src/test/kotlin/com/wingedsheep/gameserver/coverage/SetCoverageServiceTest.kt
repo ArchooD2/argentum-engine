@@ -141,28 +141,40 @@ class SetCoverageServiceTest : FunSpec({
     }
 
     context("cards we've decided never to implement") {
-        test("drop out of the denominator, so Alpha is complete with Chaos Orb unbuilt") {
-            // Chaos Orb needs physical dexterity with a real card. Left in the total it would peg
-            // LEA one short forever; excluded, the set reads done because everything we intend to
-            // build is built.
-            val lea = coverage.find { it.code == "LEA" }.shouldNotBeNull()
-            lea.notPlanned shouldBe 1
-            lea.implemented shouldBe lea.total
-            lea.percent shouldBe 100.0
+        test("drop out of the denominator, so a set's total counts only what we intend to build") {
+            // Legends excuses Falling Star (dexterity) plus Rebirth and Tempest Efreet (ante
+            // effects). Left in the total they would peg LEG three short forever; excluded, its
+            // total is every draft card we do intend to build.
+            val leg = coverage.find { it.code == "LEG" }.shouldNotBeNull()
+            leg.notPlanned shouldBe 3
+            val detail = service.detail("LEG").shouldNotBeNull()
+            leg.total shouldBe detail.draft.size - 3
         }
 
         test("are still listed in the detail view, each carrying its reason") {
-            val detail = service.detail("LEA").shouldNotBeNull()
-            val orb = detail.draft.find { it.name == "Chaos Orb" }.shouldNotBeNull()
-            orb.implemented shouldBe false
-            orb.notPlanned.shouldNotBeNull().kind shouldBe "dexterity"
+            val detail = service.detail("LEG").shouldNotBeNull()
+            val star = detail.draft.find { it.name == "Falling Star" }.shouldNotBeNull()
+            star.implemented shouldBe false
+            star.notPlanned.shouldNotBeNull().kind shouldBe "dexterity"
             // Exclusion is carried as its reason, so a flagged card can never lack an explanation.
-            orb.notPlanned.shouldNotBeNull().why.shouldNotBeEmpty()
-            detail.notPlanned shouldBe 1
+            star.notPlanned.shouldNotBeNull().why.shouldNotBeEmpty()
+            detail.notPlanned shouldBe 3
             detail.total shouldBe detail.draft.count { it.notPlanned == null }
-            // An excused set still names what it isn't counting, so a set that reads 100% can
-            // always say which cards it excused to get there.
-            detail.draft.filter { it.notPlanned != null }.map { it.name } shouldBe listOf("Chaos Orb")
+            // A set always names what it isn't counting, so a set that reads 100% can say which
+            // cards it excused to get there.
+            detail.draft.filter { it.notPlanned != null }.map { it.name }.toSet() shouldBe
+                setOf("Falling Star", "Rebirth", "Tempest Efreet")
+        }
+
+        test("Chaos Orb stops being excused once its table-flip is built — Alpha is complete") {
+            val lea = coverage.find { it.code == "LEA" }.shouldNotBeNull()
+            lea.notPlanned shouldBe 0
+            lea.implemented shouldBe lea.total
+            lea.percent shouldBe 100.0
+            val orb = service.detail("LEA").shouldNotBeNull().draft
+                .find { it.name == "Chaos Orb" }.shouldNotBeNull()
+            orb.implemented shouldBe true
+            orb.notPlanned shouldBe null
         }
 
         test("an ante card stops being excused once it is built — Antiquities and Arabian Nights") {
@@ -199,8 +211,7 @@ class SetCoverageServiceTest : FunSpec({
 
         test("summary counts them once across every set that prints them") {
             val summary = service.summary()
-            // Exclusions key on card name, so Chaos Orb is one not-planned card whether it shows
-            // up in Alpha or Beta.
+            // Exclusions key on card name, so an excused card counts once however many sets print it.
             summary.distinctNotPlanned shouldBeGreaterThanOrEqualTo 1
             summary.setsComplete shouldBe coverage.count { it.percent >= 100.0 }
         }

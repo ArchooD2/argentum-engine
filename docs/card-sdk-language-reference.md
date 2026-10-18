@@ -10245,6 +10245,19 @@ in the declare-blockers step, even before the turn-based block action has comple
   `ZoneTransitionService.moveToZone`, so every effect-driven entry (lone or batch) honours it; the card
   is matched in the zone it is leaving and simply stays there. A permanent spell enters from the
   stack, so a zone-scoped lock never stops one cast from a graveyard.
+- `CantAttackUnless(condition, filter = GroupFilter.source(), coversPlaneswalkers = true)` — the
+  creatures `filter` covers can't attack unless `condition` holds against the defender each one is
+  declared against (CR 508.1c); `Player.DefendingPlayer` in the condition is the attacked player, or
+  the controller / protector of the attacked planeswalker / battle. The default filter is the
+  creature's own restriction (Goblin Goon, Deep-Sea Serpent via
+  `Conditions.DefendingPlayerControlsLandType`); any other filter is a **global** restriction printed on
+  another permanent and resolved relative to it. `coversPlaneswalkers = false` is the "can't attack
+  **a player** unless …" wording: planeswalkers and battles stay attackable. Enforced by
+  `CantAttackUnlessDefenderRule`, which reads every battlefield permanent's printed statics (a
+  face-down or ability-stripped holder contributes nothing). Arboria = `CantAttackUnless(Conditions.Any(
+  CompareAmounts(spellsCastDuringTheirLastTurn(DefendingPlayer), GTE, 1),
+  CompareAmounts(nontokenPermanentsPutDuringTheirLastTurn(DefendingPlayer), GTE, 1)),
+  GroupFilter.AllCreatures, coversPlaneswalkers = false)`.
 - `CantAttackUnlessSacrifice(sacrificeFilter, count = 1)` — a **non-mana** attack cost, paid as
   attackers are declared: Leviathan's "this creature can't attack unless you sacrifice two Islands".
   The clause is a restriction (CR 508.1c) whose cost is determined and paid at CR 508.1h–j — not an
@@ -16039,6 +16052,15 @@ single* player crossed the threshold. The tracker path would instead sum every p
 damage together (`TurnTracking(Player.Each, …)` sums), which would falsely satisfy the threshold on
 the combined total. Backs Sidequest: Play Blitzball ("if a player was dealt 6 or more combat damage
 this turn").
+- `SPELLS_CAST_DURING_THEIR_LAST_TURN` / `NONTOKEN_PERMANENTS_PUT_DURING_THEIR_LAST_TURN` — what the
+  player did during **their own** most recent turn (facades `DynamicAmounts.spellsCastDuringTheirLastTurn(player)`
+  / `nontokenPermanentsPutDuringTheirLastTurn(player)`). Spells count whether or not they resolved; a
+  permanent counts for the player who *put* it onto the battlefield — resolving their permanent spell,
+  playing a land, or an effect of a spell or ability they controlled — whoever's control it entered
+  under, and whether or not it stayed; tokens don't count. In multiplayer "their last turn" can lie
+  several turns back; activity during other players' turns never counts, and a player who hasn't
+  finished a turn reads 0. Snapshotted into `LastTurnActivityComponent` by `TurnManager.startTurn` as
+  the player's turn ends. Not `SpellsCastLastTurn` (the previous *game* turn, side-wide). Arboria.
 - `COUNTERS_PUT_ON_CREATURE` — counters placed.
 - `LANDS_PLAYED` — lands the player explicitly played this turn (from-hand land drops only,
   derived from `LandDropsComponent`).

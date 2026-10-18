@@ -1756,7 +1756,7 @@ Families:
 - `CanOnlyBlockCreaturesWith(blockerFilter: GameObjectFilter, filter: GroupFilter)` — This creature can only block creatures matching a filter.
 - `CantAttack(filter: GroupFilter)` — Prevents the affected permanents from attacking.
 - `CantAttackOrBlockUnlessPay(amount: DynamicAmount, appliesToBlocking: Boolean)` — This permanent can't attack or block unless its controller pays amount generic mana for it (CR 508.1a / 509.1a — the payment is part of the cost of declaring it).
-- `CantAttackUnless(condition: Condition, filter: GroupFilter)`
+- `CantAttackUnless(condition: Condition, filter: GroupFilter, coversPlaneswalkers: Boolean)` — The creatures filter covers can't attack unless condition holds, read relative to the defender each attacker is declared against (CR 508.1c): `Player.DefendingPlayer` in the condition is the player…
 - `CantAttackUnlessCoAttacker(coAttackerFilter: GameObjectFilter, filter: GroupFilter)` — This creature can't attack unless another creature being declared as an attacker in the same declaration matches coAttackerFilter.
 - `CantAttackUnlessSacrifice(sacrificeFilter: GameObjectFilter, count: Int)`
 - `CantAttackYou(filter: GroupFilter, coversPlaneswalkers: Boolean)` — The affected permanents can't attack **you** — and, with coversPlaneswalkers, planeswalkers you control — but stay free to attack anyone else (CR 508.1c).

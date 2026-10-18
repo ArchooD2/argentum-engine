@@ -16,7 +16,8 @@ import com.wingedsheep.sdk.dsl.station
 // Note: Player, Zone, and GameObjectFilter are in the same package (com.wingedsheep.sdk.scripting)
 
 /**
- * Trackable per-player statistics that reset at end of turn.
+ * Trackable per-player statistics — mostly current-turn counters reset at each turn boundary, plus a few
+ * that look back to the previous turn or to the player's own last turn (`*_LAST_TURN`, `*_SINCE_YOUR_LAST_TURN`).
  *
  * Used by [DynamicAmount.TurnTracking] to read turn-tracking counters from player components.
  */
@@ -111,6 +112,20 @@ enum class TurnTracker {
      * Resolute Monarch).
      */
     DEALT_COMBAT_DAMAGE_SINCE_YOUR_LAST_TURN,
+    /**
+     * Spells the player cast during **their own** last turn (countered or not — casting is what
+     * counts). "Their last turn" can lie several turns back in multiplayer; spells cast during other
+     * players' turns never count, and a player who hasn't finished a turn reads 0. Snapshotted when
+     * the player's turn ends. Arboria's "that player cast a spell … during their last turn".
+     */
+    SPELLS_CAST_DURING_THEIR_LAST_TURN,
+    /**
+     * Nontoken permanents the player **put** onto the battlefield during their own last turn —
+     * resolving their permanent spell, playing a land, or an effect of a spell or ability they
+     * controlled — whoever's control it entered under, and whether or not it stayed (Arboria
+     * rulings). Same snapshot and scope as [SPELLS_CAST_DURING_THEIR_LAST_TURN].
+     */
+    NONTOKEN_PERMANENTS_PUT_DURING_THEIR_LAST_TURN,
     /** Indicator (0 or 1) that the player put one or more counters on a creature this turn. */
     COUNTERS_PUT_ON_CREATURE,
     /** Number of land cards the player played this turn (derived from `LandDropsComponent`). */
@@ -393,6 +408,10 @@ enum class TurnTracker {
             "whether a creature or planeswalker under ${player.possessive} control was dealt excess damage this turn"
         DEALT_COMBAT_DAMAGE_SINCE_YOUR_LAST_TURN ->
             "whether ${player.description} were dealt combat damage since their last turn"
+        SPELLS_CAST_DURING_THEIR_LAST_TURN ->
+            "the number of spells ${player.description} cast during ${player.possessive} last turn"
+        NONTOKEN_PERMANENTS_PUT_DURING_THEIR_LAST_TURN ->
+            "the number of nontoken permanents ${player.description} put onto the battlefield during ${player.possessive} last turn"
         COUNTERS_PUT_ON_CREATURE -> "whether ${player.description} put a counter on a creature this turn"
         LANDS_PLAYED -> "the number of lands ${player.description} played this turn"
         LANDS_ENTERED_UNDER_CONTROL -> "the number of lands that entered the battlefield under ${player.possessive} control this turn"

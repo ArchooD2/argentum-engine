@@ -1155,6 +1155,29 @@ data class AiProfile(
      */
     val refuseWastedPayoffs: Boolean = false,
     /**
+     * Press a winning position instead of sitting on it: who is the beatdown is read off the board
+     * ([BoardRole]), and the side that is ahead is credited for the damage an attack deals.
+     *
+     * The user report: "sometimes it just sits there, giving the player the opportunity to grow in
+     * strength again." Four Grizzly Bears facing one Hill Giant, both players on 20, and the AI
+     * declares no attack: sending all four loses a Bear to the Giant's block and deals six, and the
+     * leaf scored that 13.4 against 13.8 for passing. The cause is that a one-ply leaf has no clock.
+     * The attack leaf and the pass leaf sit at the same moment, so the turn a pass hands the
+     * opponent — a draw step toward the answer — is free in both, and the attack's six damage is
+     * priced on [com.wingedsheep.ai.engine.evaluation.LifeDifferential]'s defender's curve, half a
+     * point each above 15. Bad trades that a dominant board makes to push damage never paid.
+     *
+     * With this on, [CombatAdvisor]'s attack score adds the damage dealt as the share of the
+     * opponent's life it removes — urgency already cashed — on the evaluator's race scale, times the
+     * dominance of the board the combat leaves: resources share (creatures plus cards in hand) and
+     * race lead, averaged, in `[-1, 1]`. It is continuous — no threshold for "ahead" — it is zero
+     * whenever the remaining board does not dominate, so the side that is behind attacks exactly
+     * as before, and a trade that gives the lead away earns nothing. A plan whose crack-back is
+     * lethal gets no credit at all. Local search also starts from the all-in plan, which its
+     * one-attacker climb cannot reach when every single attacker alone is a bad attack.
+     */
+    val pressWhenAhead: Boolean = false,
+    /**
      * Expect the opponent to use what its board can do in a fight. Every combat [CombatAdvisor]
      * simulates — each attack plan it weighs, each block it tries — gives the opponents their
      * windows (after attackers are declared, after blockers are) and lets them use the activated
@@ -2123,6 +2146,16 @@ data class AiProfile(
             taxCountersReadTheirMana = true,
             refuseWastedPayoffs = true,
             anticipateCombatResponses = true,
+            pressWhenAhead = true,
+        )
+
+        /**
+         * [LIVE] without [pressWhenAhead]: `just arena live-without-pressure live 300` prices the
+         * flag on top of everything it ships with.
+         */
+        val LIVE_WITHOUT_PRESSURE = LIVE.copy(
+            id = "live-without-pressure",
+            pressWhenAhead = false,
         )
 
         /**

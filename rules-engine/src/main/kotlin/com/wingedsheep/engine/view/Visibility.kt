@@ -25,6 +25,7 @@ import com.wingedsheep.sdk.scripting.ConditionalStaticAbility
 import com.wingedsheep.sdk.scripting.LookAtFaceDownCreatures
 import com.wingedsheep.sdk.scripting.LookAtTopOfLibrary
 import com.wingedsheep.sdk.scripting.OpponentsPlayWithHandsRevealed
+import com.wingedsheep.sdk.scripting.PlayersPlayWithHandsRevealed
 import com.wingedsheep.sdk.scripting.PlayFromTopOfLibrary
 import com.wingedsheep.sdk.scripting.PlayersRevealTopOfLibrary
 import com.wingedsheep.sdk.scripting.RevealTopOfLibrary
@@ -52,7 +53,8 @@ class Visibility(
         isSpectator: Boolean = false,
     ): Boolean = when (zoneKey.zoneType) {
         Zone.LIBRARY -> false
-        Zone.HAND -> debugMode || (!isSpectator && (
+        // A symmetric reveal is public, so spectators receive it too.
+        Zone.HAND -> debugMode || revealsAllHands(state) || (!isSpectator && (
             zoneKey.ownerId == viewingPlayerId ||
                 state.actorFor(zoneKey.ownerId) == viewingPlayerId ||
                 zoneKey.ownerId in state.teammatesOf(viewingPlayerId) ||
@@ -350,6 +352,16 @@ class Visibility(
 
     private fun revealsOpponentHandsTo(state: GameState, playerId: EntityId): Boolean =
         hasActiveStaticAbility(state, playerId) { it is OpponentsPlayWithHandsRevealed }
+
+    /**
+     * Whether every hand is face up to everyone: *any* player controls a symmetric
+     * [PlayersPlayWithHandsRevealed] (Revelation), which opens every player's hand, including the
+     * hands of players who control nothing.
+     */
+    private fun revealsAllHands(state: GameState): Boolean =
+        state.turnOrder.any { controllerId ->
+            hasActiveStaticAbility(state, controllerId) { it is PlayersPlayWithHandsRevealed }
+        }
 
     private fun hasActiveStaticAbility(
         state: GameState,

@@ -1667,9 +1667,13 @@ class GameSession(
         val state = gameState ?: return null
         if (!state.gameOver) return null
 
-        // If no winner, it's a draw (both players lost simultaneously)
+        // No winner is a draw. A stalled or abandoned game, or every remaining player losing at once,
+        // is DRAW; a draw the engine reached while someone was still in — "the game is a draw"
+        // (CR 104.4c, Divine Intervention) — is CARD_EFFECT. Seats eliminated earlier in a pod keep
+        // their loss marker, so this asks whether anyone is still in, not whether anyone lost.
         if (state.winnerId == null) {
-            return GameOverReason.DRAW
+            val someoneStillIn = state.turnOrder.any { state.getEntity(it)?.get<PlayerLostComponent>() == null }
+            return if (someoneStillIn && stallMessage() == null) GameOverReason.CARD_EFFECT else GameOverReason.DRAW
         }
 
         // Find why the losing side lost. In Two-Headed Giant a whole team is defeated, so prefer a

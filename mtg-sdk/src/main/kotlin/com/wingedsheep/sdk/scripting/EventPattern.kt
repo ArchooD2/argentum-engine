@@ -2664,15 +2664,30 @@ sealed interface EventPattern : TextReplaceable<EventPattern> {
          * also fire for a counter paid as a cost or removed by an opponent.
          */
         val byDamagePrevention: Boolean = false,
+        /**
+         * Which player must have *removed* the counters — the mirror of
+         * [CountersPlacedEvent.placedBy]. `null` (default) matches any remover. [Player.You] is
+         * "When **you** remove the last intervention counter" (Divine Intervention): the remover is
+         * the controller of the effect that removed them, or the player who paid the cost, so a
+         * removal by an opponent's effect doesn't fire it. A removal the engine can't attribute to a
+         * player (a state-based action, damage to a battle) never matches a non-null selector.
+         */
+        val removedBy: Player? = null,
     ) : EventPattern {
         override val description: String = buildString {
             val typeLabel = counterType?.let { "${it.printed} " } ?: ""
-            if (lastRemoved) {
-                append("the last ${typeLabel}counter is removed from ")
-            } else {
-                append("one or more ${typeLabel}counters are removed from ")
+            val from = describeObjectForEvent(filter)
+            // "you remove", "those players remove", but "an opponent removes".
+            val remover = removedBy?.let {
+                val plural = it.description == "you" || it.description.startsWith("those ")
+                "${it.description} remove${if (plural) "" else "s"}"
             }
-            append(describeObjectForEvent(filter))
+            when {
+                remover != null && lastRemoved -> append("$remover the last ${typeLabel}counter from $from")
+                remover != null -> append("$remover one or more ${typeLabel}counters from $from")
+                lastRemoved -> append("the last ${typeLabel}counter is removed from $from")
+                else -> append("one or more ${typeLabel}counters are removed from $from")
+            }
             if (byDamagePrevention) append(" this way")
         }
     }

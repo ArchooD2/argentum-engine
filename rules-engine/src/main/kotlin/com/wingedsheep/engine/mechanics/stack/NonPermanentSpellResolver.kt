@@ -149,8 +149,11 @@ internal class NonPermanentSpellResolver(
 
             val effectResult = if (fusedDefinition != null) {
                 val entries = fusedEntries(state, spellId, fusedDefinition, targetRequirements, mainAlignedTargets)
+                // Each half runs as a root of its own, not as a position in the spell's effect.
+                val halves = context.copy(programOrigin = com.wingedsheep.engine.core.ProgramOrigin.BuiltBy(
+                    com.wingedsheep.sdk.core.Keyword.FUSE.name, context.programOrigin))
                 processPreTargetedEffectQueue(newState, entries + spliceEntries,
-                    PreTargetedEffectContext(baseContext = context, controllerId = context.controllerId,
+                    PreTargetedEffectContext(baseContext = halves, controllerId = context.controllerId,
                         sourceId = spellId, sourceName = cardComponent?.name, xValue = context.xValue,
                         triggeringEntityId = null, objectReferences = context.objectReferences),
                     effects::execute, spliceTargetValidator, emptyList())
@@ -222,6 +225,8 @@ internal class NonPermanentSpellResolver(
     ): EffectContext =
         EffectContext(
             sourceId = spellId,
+            // The spell's effect runs as a program whose origin is this resolving stack object.
+            programOrigin = state.objectRef(spellId)?.let { com.wingedsheep.engine.core.ProgramOrigin.Resolving(it) },
             objectReferences = com.wingedsheep.engine.handlers.ObjectReferenceEnvironment(
                 captured = true, origin = state.objectRef(spellId), source = state.objectRef(spellId),
                 resolutionKey = "$spellId:${state.objectRef(spellId)?.generation}",

@@ -201,7 +201,10 @@ class ChaosOrbScenarioTest : ScenarioTestBase() {
             }
 
             test("if it doesn't turn over completely, nothing it touches is destroyed") {
+                // A strength-0 release averages under one half-turn, but its spin noise still turns it over
+                // about one roll in forty. Pin the seed: test the limp release, not the dice.
                 val game = baseScenario()
+                    .withRngSeed(1L)
                     .withCardOnBattlefield(2, "Grizzly Bears")
                     .build()
                 val bears = game.findPermanent("Grizzly Bears")!!

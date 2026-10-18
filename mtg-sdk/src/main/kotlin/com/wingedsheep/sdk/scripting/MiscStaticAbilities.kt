@@ -3,6 +3,7 @@ package com.wingedsheep.sdk.scripting
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.core.ManaCost
+import com.wingedsheep.sdk.core.ManaSymbol
 import com.wingedsheep.sdk.core.Zone
 import com.wingedsheep.sdk.scripting.conditions.Condition
 import com.wingedsheep.sdk.scripting.effects.Effect
@@ -372,23 +373,6 @@ enum class TappedForManaType {
 }
 
 /**
- * Lands matching [filter] produce one mana of a color of their controller's choice instead of
- * their normal mana ("instead of any other type"). The land still taps as a mana ability; only
- * the produced mana's color is replaced, and the controller chooses the color each time.
- *
- * Used by Pulse of Llanowar ("If a basic land you control is tapped for mana, it produces mana of
- * a color of your choice instead of any other type") with `filter = GameObjectFilter.BasicLand.youControl()`.
- *
- * This is a global mana-production replacement: it is checked whenever a land's mana ability
- * resolves (manual taps) and is honored by the [com.wingedsheep] ManaSolver when auto-tapping for
- * costs (a matched land is treated as a five-color source). Unlike [OverrideEnchantedLandManaColor]
- * (a per-aura fixed-color override) this is filter-based and the color is a free choice.
- *
- * @property filter Which lands have their produced mana color replaced (matched via projected
- *   state from the land controller's perspective, so `youControl()` means "you, the controller of
- *   this static, control the land").
- */
-/**
  * Creatures dealt damage by this permanent are doomed for the rest of the turn: they can't be
  * regenerated, and if they would die they are exiled instead. Runesword's two riders, which the
  * printed card states as separate sentences but which key off the same event and name the same
@@ -450,27 +434,69 @@ data class CreaturesDamagedBySourceAreDoomed(
     }
 }
 
+/**
+ * Lands matching [filter] produce other mana instead of their normal mana — a replacement on the
+ * land's mana ability's output (the land still taps as a mana ability). Three shapes:
+ *
+ * - **Pulse of Llanowar** — "If a basic land you control is tapped for mana, it produces mana of a
+ *   color of your choice instead of any other type": `filter = GameObjectFilter.BasicLand.youControl()`,
+ *   [produces] null. The controller chooses the colour each time.
+ * - **Deep Water** — "it produces {U} instead of any other type": `produces = ManaSymbol.Colored(BLUE)`,
+ *   granted for a turn.
+ * - **Quarum Trench Gnomes** — "it produces colorless mana instead of white mana":
+ *   `produces = ManaSymbol.Colorless, replaces = WHITE`, granted to the targeted land forever.
+ *
+ * Checked whenever a land's mana ability resolves (manual taps) and honoured by the ManaSolver when
+ * auto-tapping for costs, both folding every matching replacement the same way: fixed ones in
+ * battlefield order, free-choice ones last (so a land under both Pulse and the Gnomes can still make
+ * any colour — the order its controller would pick, since it offers every other order's options).
+ * Unlike [OverrideEnchantedLandManaColor] (a per-aura override) this is filter-based.
+ *
+ * @property filter Which lands have their produced mana replaced (matched via projected state from
+ *   the static controller's perspective, so `youControl()` means "you, the controller of this
+ *   static, control the land").
+ */
 @SerialName("ReplaceLandManaColor")
 @Serializable
 data class ReplaceLandManaColor(
     val filter: GameObjectFilter,
     /**
-     * When set, matched lands produce *this* color rather than one of the controller's choice —
-     * Deep Water's "it produces {U} instead of any other type". Null (the default) keeps Pulse of
-     * Llanowar's free choice, which the engine implements by swapping in an add-one-mana-of-any-color
-     * ability.
+     * The mana a matched land produces instead. Null (the default) keeps Pulse of Llanowar's
+     * "mana of a color of your choice", which the engine implements by swapping in an
+     * add-one-mana-of-any-color ability. [ManaSymbol.Colored] pins a colour — Deep Water's "it
+     * produces {U} instead of any other type" — and [ManaSymbol.Colorless] makes it colorless —
+     * Quarum Trench Gnomes' "it produces colorless mana instead of white mana". No other symbol
+     * names one mana a land could produce.
      */
-    val color: Color? = null
+    val produces: ManaSymbol? = null,
+    /**
+     * Only mana of this colour is replaced; the land's other output passes through untouched —
+     * Quarum Trench Gnomes replaces *white* mana, so a Plains that also taps for {G} still makes {G}.
+     * Null (the default) replaces mana of any type ("instead of any other type").
+     */
+    val replaces: Color? = null,
 ) : StaticAbility {
-    override val description: String =
+    init {
+        require(produces == null || produces is ManaSymbol.Colored || produces is ManaSymbol.Colorless) {
+            "ReplaceLandManaColor.produces must be a colored or the colorless symbol, was $produces"
+        }
+    }
+
+    override val description: String = buildString {
         // describeObjectForEvent, not filter.description: it renders the article and puts the
         // controller clause *after* the noun ("a land you control"), where the raw filter
         // description would prefix it ("a you control land").
-        if (color != null) {
-            "If ${describeObjectForEvent(filter)} is tapped for mana, it produces {${color.symbol}} instead of any other type"
-        } else {
-            "If ${describeObjectForEvent(filter)} is tapped for mana, it produces mana of a color of its controller's choice instead of any other type"
-        }
+        append("If ${describeObjectForEvent(filter)} is tapped for mana, it produces ")
+        append(
+            when (produces) {
+                null -> "mana of a color of its controller's choice"
+                is ManaSymbol.Colorless -> "colorless mana"
+                else -> produces.toString()
+            }
+        )
+        append(if (replaces != null) " instead of ${replaces.name.lowercase()} mana" else " instead of any other type")
+    }
+
     override fun applyTextReplacement(replacer: TextReplacer): StaticAbility {
         val newFilter = filter.applyTextReplacement(replacer)
         return if (newFilter !== filter) copy(filter = newFilter) else this

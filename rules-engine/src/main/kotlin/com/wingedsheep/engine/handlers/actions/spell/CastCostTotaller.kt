@@ -95,17 +95,6 @@ internal class CastCostTotaller(
             }
         }
 
-        // "This spell costs {W}{U} more to cast for each target beyond the first" (Officious
-        // Interrogation). A free cast's base skips the modifier pipeline, but a cost *increase* is
-        // not part of the cost "without paying its mana cost" waives (CR 601.2f) — the card's own
-        // ruling spells it out: a free cast still owes the tax for targets beyond the first. Every
-        // other base, alternative costs included, was priced with the chosen targets already.
-        if (cardDef != null && playForFree) {
-            effectiveCost = effectiveCost + costCalculator.selfPerTargetTax(
-                cardDef, action.targets.map { it.toEntityId() }
-            )
-        }
-
         // Per-mode additional mana cost (e.g., Feed the Cycle "pay {B}" mode). With choose-N
         // (rule 700.2h), the additional mana cost of every chosen mode stacks, and escalate's
         // per-extra-mode mana (CR 702.120a) is added for each mode beyond the first.
@@ -154,14 +143,15 @@ internal class CastCostTotaller(
             if (fixedAltCost != null) {
                 effectiveCost = fixedAltCost.fixedCost
             }
-            // Apply runtime mana tax from exile permissions (e.g., Soul Partition) on top of
-            // whichever base applies (printed cost, or the fixed alternative above).
-            val runtimeCostIncrease = state.getEntity(action.cardId)
-                ?.get<PlayWithCostIncreaseComponent>()
-                ?.takeIf { it.controllerId == action.playerId }
-            if (runtimeCostIncrease != null) {
-                effectiveCost = effectiveCost + runtimeCostIncrease.cost
-            }
+        }
+        // Apply runtime mana tax from exile permissions (e.g., Soul Partition) on top of whichever
+        // base applies (printed cost, the fixed alternative above, or a free cast's {0} — an
+        // increase survives "without paying its mana cost", CR 601.2f).
+        val runtimeCostIncrease = state.getEntity(action.cardId)
+            ?.get<PlayWithCostIncreaseComponent>()
+            ?.takeIf { it.controllerId == action.playerId }
+        if (runtimeCostIncrease != null) {
+            effectiveCost = effectiveCost + runtimeCostIncrease.cost
         }
 
         // Splice (CR 702.47a): every revealed splice card's cost is an *additional* cost, so it lands
@@ -251,7 +241,7 @@ internal class CastCostTotaller(
         // Account for improvise (CR 702.126): each tapped artifact pays {1} of the generic in the
         // spell's *total* cost, with no cap beyond that generic. Shares the tap-for-generic carrier
         // with waterbend, and no card has both — the cap above being 0 is what tells them apart.
-        val costAfterImprovise = if (!playForFree && cardDef != null && validateWaterbendCap == 0 &&
+        val costAfterImprovise = if (cardDef != null && validateWaterbendCap == 0 &&
             action.alternativePayment != null && action.alternativePayment.tapForGenericPermanents.isNotEmpty()
         ) {
             alternativePaymentHandler.calculateReducedCostForImprovise(
@@ -293,6 +283,17 @@ internal class CastCostTotaller(
         // normal cast of that face: its own mana cost, with every modifier judged against it.
         val castFace = action.faceIndex?.let { idx -> cardDef?.cardFaces?.getOrNull(idx) }
         return when {
+            // "Without paying its mana cost" is a {0} alternative cost (CR 118.9): increases still
+            // land on it, and reductions then take them back off (CR 601.2f).
+            playForFree && cardDef != null -> costCalculator.calculateFreeCastCost(
+                state,
+                castFace?.let { costCalculator.faceCharacteristics(cardDef, it) } ?: cardDef,
+                action.playerId,
+                action.targets.map { it.toEntityId() },
+                fromZone = if (castingFromCommandZone) Zone.COMMAND else castSourceZone(state, action.cardId),
+                declaredCostSlot = action.declaredCostSlot,
+                card = cardDef,
+            )
             playForFree -> ManaCost.ZERO
             action.useAlternativeCost && action.alternativeCostType == AlternativeCostType.ESCAPE && cardDef != null -> {
                 val escape = EscapeCasts.effectiveEscape(

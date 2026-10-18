@@ -14,6 +14,7 @@ import com.wingedsheep.engine.mechanics.ControllerGrants
 import com.wingedsheep.engine.mechanics.layers.ProjectedState
 import com.wingedsheep.engine.mechanics.targeting.HexproofSuppression
 import com.wingedsheep.engine.mechanics.targeting.SourceKindProtection
+import com.wingedsheep.engine.mechanics.targeting.UntargetableByRules
 import com.wingedsheep.engine.mechanics.targeting.PlayerTargetRestriction
 import com.wingedsheep.engine.state.GameState
 import com.wingedsheep.engine.state.ZoneKey
@@ -271,7 +272,8 @@ internal class ResolutionTargetValidator(
         val entityController = projected.getController(target.entityId)
             ?: state.getEntity(target.entityId)?.get<ControllerComponent>()?.playerId
         return passesTargetingRestrictions(
-            state, projected, target, entityController, controllerId, sourceId, sourceColors, targetingSourceType
+            state, projected, target, entityController, controllerId, sourceId, sourceColors, targetingSourceType,
+            getRequirementForTargetIndex(index, targetRequirements), sourceSubtypes
         ) &&
             passesProtection(state, projected, target, entityController, controllerId, sourceId, sourceColors, sourceSubtypes) &&
             stillMatchesRequirementFilter(state, projected, index, target, targetRequirements, predicateContext)
@@ -286,7 +288,9 @@ internal class ResolutionTargetValidator(
         controllerId: EntityId,
         sourceId: EntityId?,
         sourceColors: Set<Color>,
-        targetingSourceType: TargetingSourceType
+        targetingSourceType: TargetingSourceType,
+        requirement: TargetRequirement?,
+        sourceSubtypes: Set<String>
     ): Boolean {
         // Check shroud — can't be targeted by anyone (Rule 702.18)
         if (projected.hasKeyword(target.entityId, "SHROUD")) return false
@@ -297,6 +301,14 @@ internal class ResolutionTargetValidator(
         // permanent that gained the restriction after being targeted is dropped here.
         if (targetingSourceType == TargetingSourceType.SPELL &&
             projected.hasKeyword(target.entityId, AbilityFlag.CANT_BE_TARGETED_BY_SPELLS)
+        ) {
+            return false
+        }
+
+        // CantBeTargetedBy (Tetsuo Umezawa) — read against the face on the stack.
+        if (UntargetableByRules.targetingError(
+                state, target.entityId, sourceId, targetingSourceType, requirement, sourceSubtypes.ifEmpty { null }
+            ) != null
         ) {
             return false
         }

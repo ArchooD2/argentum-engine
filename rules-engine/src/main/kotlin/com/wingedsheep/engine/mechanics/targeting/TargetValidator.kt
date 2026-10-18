@@ -499,6 +499,13 @@ class TargetValidator(
         val spellTargetingError = checkCantBeTargetedBySpells(state, target, targetingSourceType)
         if (spellTargetingError != null) return spellTargetingError
 
+        // CantBeTargetedBy (Tetsuo Umezawa) — read against the face being cast.
+        if (target is ChosenTarget.Permanent) {
+            UntargetableByRules.targetingError(
+                state, target.entityId, sourceId, targetingSourceType, requirement, sourceSubtypes.ifEmpty { null }
+            )?.let { return it }
+        }
+
         // Check hexproof from a quality — color, non-color, card type (Rule 702.11d)
         val hexproofError = checkHexproofFrom(state, target, casterId, sourceColors, sourceId)
         if (hexproofError != null) return hexproofError

@@ -15,6 +15,7 @@ import com.wingedsheep.engine.mechanics.targeting.HexproofSuppression
 import com.wingedsheep.engine.mechanics.targeting.PlayerTargetRestriction
 import com.wingedsheep.engine.mechanics.targeting.SourceKindProtection
 import com.wingedsheep.engine.mechanics.targeting.StackObjectTargeting
+import com.wingedsheep.engine.mechanics.targeting.UntargetableByRules
 import com.wingedsheep.engine.state.GameState
 import com.wingedsheep.engine.state.ZoneKey
 import com.wingedsheep.engine.state.components.battlefield.AttachedToComponent
@@ -44,7 +45,23 @@ class TargetEnumerationUtils(
         playerId: EntityId,
         requirement: TargetRequirement,
         sourceId: EntityId? = null,
-        targetingSourceType: TargetingSourceType = TargetingSourceType.ANY
+        targetingSourceType: TargetingSourceType = TargetingSourceType.ANY,
+        /** The cast face's subtypes when it isn't the entity's own face (a disturb Aura back). */
+        spellSubtypes: Set<String>? = null
+    ): List<EntityId> {
+        val candidates = findCandidateTargets(state, playerId, requirement, sourceId, targetingSourceType)
+        // CantBeTargetedBy: keyed on the source and this requirement, so computed once.
+        val untargetableKeywords = UntargetableByRules.blockingKeywords(state, sourceId, targetingSourceType, requirement, spellSubtypes)
+        return if (untargetableKeywords.isEmpty()) candidates
+        else candidates.filterNot { UntargetableByRules.isBlocked(state, it, untargetableKeywords) }
+    }
+
+    private fun findCandidateTargets(
+        state: GameState,
+        playerId: EntityId,
+        requirement: TargetRequirement,
+        sourceId: EntityId?,
+        targetingSourceType: TargetingSourceType
     ): List<EntityId> {
         return when (requirement) {
             is TargetPlayer -> state.turnOrder.filter { state.hasEntity(it) && !playerHasShroud(state, it) &&
@@ -360,7 +377,8 @@ class TargetEnumerationUtils(
         playerId: EntityId,
         targetReqs: List<TargetRequirement>,
         sourceId: EntityId? = null,
-        targetingSourceType: TargetingSourceType = TargetingSourceType.ANY
+        targetingSourceType: TargetingSourceType = TargetingSourceType.ANY,
+        spellSubtypes: Set<String>? = null
     ): List<TargetInfo> {
         if (com.wingedsheep.engine.handlers.DependentTargetSelection.isRequired(targetReqs)) {
             return dependentTargetInfos(state, playerId, targetReqs, sourceId, targetingSourceType)
@@ -368,7 +386,7 @@ class TargetEnumerationUtils(
         return targetReqs.mapIndexed { index, req ->
             // A board-state count ("X target creatures, where X is …") is knowable now; an X from
             // the cost is not, and stays at the static bounds until the player announces it.
-            val candidates = findValidTargets(state, playerId, req, sourceId, targetingSourceType)
+            val candidates = findValidTargets(state, playerId, req, sourceId, targetingSourceType, spellSubtypes)
             val bounds = com.wingedsheep.engine.mechanics.targeting.OwnerTargetDistribution.bounds(state, req, candidates)
                 ?: DynamicTargetCount.bounds(req, xValue = null) { amount ->
                 predicateEvaluator.amounts.evaluate(state, amount, EffectContext(sourceId = sourceId, controllerId = playerId))

@@ -540,6 +540,8 @@ class BeginningPhaseManager(
         StatePredicate.SharesNameWithSpellCastThisTurn -> false
         StatePredicate.PutIntoGraveyardThisTurn -> false
         StatePredicate.MilledThisTurn -> false
+        // Hand-only predicate; untap candidates are battlefield permanents.
+        StatePredicate.DrawnThisTurn -> false
         StatePredicate.PutIntoGraveyardFromBattlefieldThisTurn -> false
         // Combat-partner history is cleared at cleanup, so nothing has blocked anything yet this turn.
         is StatePredicate.BlockPairedWithEntityThisTurn -> false

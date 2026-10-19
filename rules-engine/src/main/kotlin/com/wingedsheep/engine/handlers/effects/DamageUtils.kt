@@ -24,6 +24,9 @@ import com.wingedsheep.engine.handlers.PredicateEvaluator
 import com.wingedsheep.engine.state.nameVisibleToAll
 import com.wingedsheep.engine.replacement.PendingReplacementRider
 import com.wingedsheep.engine.state.GameState
+import com.wingedsheep.engine.state.innermostResolvingFrame
+import com.wingedsheep.engine.core.FinishResolvingAbilityContinuation
+import com.wingedsheep.engine.core.FinishResolvingSpellContinuation
 import com.wingedsheep.engine.state.ZoneKey
 import com.wingedsheep.engine.state.components.battlefield.AttachedToComponent
 import com.wingedsheep.engine.state.components.battlefield.AttachmentsComponent
@@ -1641,7 +1644,8 @@ object DamageUtils {
                 val mod = it.effect.modification
                 mod is SerializableModification.PreventAllDamageTo &&
                     (!mod.combatOnly || isCombatDamage) &&
-                    targetId in it.effect.affectedEntities
+                    targetId in it.effect.affectedEntities &&
+                    (!mod.onlyCausedByObjectTargetingIt || resolvingObjectTargets(state, targetId))
             }) {
             return PreventionShieldResult(state, 0)
         }
@@ -1763,6 +1767,30 @@ object DamageUtils {
         val (reducedState, reducedDamage) =
             applyStaticDamageReduction(newState, targetId, remainingDamage, isCombatDamage, sourceId, predicateEvaluator = predicateEvaluator)
         return PreventionShieldResult(reducedState, reducedDamage, lifeGains)
+    }
+
+    /**
+     * True when the innermost spell or ability now resolving — the cause of any damage dealt
+     * during its resolution — has [recipientId] among its chosen targets, as the same object it
+     * targeted (CR 400.7). Combat damage and other damage dealt outside a resolution have no such
+     * cause. Read by the Silhouette shield (`PreventionSourceFilter.TargetingRecipient`).
+     */
+    private fun resolvingObjectTargets(state: GameState, recipientId: EntityId): Boolean {
+        val resolving = when (val frame = state.innermostResolvingFrame()) {
+            is FinishResolvingSpellContinuation -> frame.spellObject
+            is FinishResolvingAbilityContinuation -> frame.abilityObject
+            else -> return false
+        }
+        val targets = state.getEntity(resolving.entityId)?.get<TargetsComponent>() ?: return false
+        val targeted = targets.targets.any { target ->
+            when (target) {
+                is ChosenTarget.Player -> target.playerId
+                is ChosenTarget.Permanent -> target.entityId
+                is ChosenTarget.Card -> target.cardId
+                is ChosenTarget.Spell -> target.spellEntityId
+            } == recipientId
+        }
+        return targeted && targets.targetObjectRefs[recipientId]?.let(state::isCurrentObject) != false
     }
 
     /**

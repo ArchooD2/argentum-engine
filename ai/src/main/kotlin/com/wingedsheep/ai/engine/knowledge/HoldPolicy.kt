@@ -294,6 +294,7 @@ class HoldPolicy(
             deferToLaterWindow = holdExpiringGrantsForCombat,
             refuseUnspendable = refuseUnspendableGrants,
             readShrinks = refuseWastedPayoffs,
+            readRestrictions = refuseWastedPayoffs,
             lifelinkWaitsForBlocks = lifelinkWaitsForBlocks,
         )
         return if (holds) TimingVerdict.NoWindow else TimingVerdict.Neutral

@@ -28,6 +28,7 @@ Format — newest first, one bullet each:
 
 ## Changes
 
+- #3478 Holds "target creature can't attack this turn" for the opponent's turn and "can't block" for its own: no longer spends Edifice of Authority on its own turn (where it restrains nothing) just for the brick counter, keeping it untapped to stop the opponent's attacker before combat
 - #3477 Holds an end-of-turn lifelink grant until blockers are declared, so it no longer pays (e.g. discards) for lifelink on a creature that then doesn't block, or for two life at 20 before blocks
 - #3476 Puts mana and other gift Auras on its own permanents and steal/strip Auras on the opponent's: reads land-mana bonuses (Overgrowth, Wild Growth), granted activated abilities, protection, unblockability, dynamic stat boosts, "you control enchanted permanent", "loses all abilities" and conditional statics, so Overgrowth no longer ramps the opponent's Swamp
 - #3421 Presses a winning position instead of sitting on it: when the board it would leave still dominates (creatures and cards in hand, and the race each way), an attack is credited for the damage it deals, so a team of four Bears swings past a lone Hill Giant and trades a Bear for six damage, and a bigger army trades evenly rather than waiting; behind, at parity, or facing a lethal crack-back it attacks exactly as before.

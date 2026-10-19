@@ -202,11 +202,24 @@ SDK and client tests are supporting layers; don't let them substitute for engine
 details (`ScenarioTestBase` vs `GameTestDriver`, inline test cards) and which command to run: the
 **`verify`** skill.
 
-**New UI/UX must be seen, not just typechecked.** Set the board up (the **`generate-scenario`** skill
-writes a scenario for the dev scenario loader), drive the new flow in a real browser — by hand or with
-Playwright as a browser driver — and make sure it looks clean and polished: layout, labels, highlighting,
-nothing overlapping or stale — and fix what looks off. **Don't write E2E specs and don't run the E2E suite** (`just e2e*`) — it
-takes too long. Manual verification is the check.
+**New UI/UX must be seen, not just typechecked.** If the feature touches the frontend, or changes what
+existing UI shows, try it yourself before the PR:
+
+1. Start this checkout's app in the background with `just ui-dev <server-port> <client-port>`, using
+   free ports so you never hit another agent's app.
+2. Set the board up. The **`generate-scenario`** skill writes the scenario; POST it to
+   `/api/dev/scenarios` and open the client with the seat token it returns.
+3. Drive every prompt and state of the new flow in a real browser, by hand or with a throwaway
+   Playwright script used only as a browser driver. Look at each screenshot as a player would:
+   layout, labels, highlighting, nothing overlapping, clipped or stale. Fix what looks off and take
+   the shots again.
+4. Put the final screenshots in the PR body (before/after when the change is subtle). Host them as
+   [`web-client/AGENTS.md`](../../../web-client/AGENTS.md) "Screenshots for UI/UX PRs" describes, never
+   committed to the feature branch. Stop the servers when you're done.
+
+**Don't write E2E specs and don't run the E2E suite** (`just e2e*`): it takes too long, and the manual
+check replaces it. If you couldn't run the app or view the images, say so in the PR instead of claiming
+a UX pass.
 
 ## Step 8: Update the docs in the same change
 

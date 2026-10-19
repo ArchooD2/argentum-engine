@@ -91,6 +91,16 @@ docs it points at; load those when the work needs them.
   single source behind `/help` and the inline `HelpTip` popovers — in the *same* PR: add a topic, or
   correct the ones the change makes wrong, and link it from `related` on its neighbours. Audience: knows
   Magic, new to Argentum — explain what the app does, not the rules.
+- **Try frontend changes in a real browser, and put screenshots in the PR.** Any change players can
+  see — a new or changed component, decision flow, layout, label, or an engine/server change that
+  shows up through existing UI — is checked by hand before the PR: run this checkout's app
+  (`just ui-dev <server-port> <client-port>`), set the board up with a dev scenario
+  (`generate-scenario` skill), click through the flow as a player would, and fix what looks off
+  (layout, labels, highlighting, overlap, clipping, stale state). Typechecks and unit tests don't
+  count as that check. **No E2E:** don't write Playwright specs or run `just e2e*`; Playwright as a
+  throwaway browser driver is fine. The PR body embeds screenshots of the running app (before/after
+  when the change is subtle). [`web-client/AGENTS.md`](web-client/AGENTS.md) explains how to capture
+  and host them. If you couldn't run or view the app, say so in the PR; don't claim a UX pass.
 
 ## Module layout
 

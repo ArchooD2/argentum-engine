@@ -20,6 +20,7 @@ import com.wingedsheep.engine.core.HandLookedAtEvent
 import com.wingedsheep.engine.core.HandRevealedEvent
 import com.wingedsheep.engine.core.LookedAtCardsEvent
 import com.wingedsheep.engine.core.OrderObjectsDecision
+import com.wingedsheep.engine.core.OrderTriggersDecision
 import com.wingedsheep.engine.core.PendingDecision
 import com.wingedsheep.engine.core.PlayCardDecision
 import com.wingedsheep.engine.core.ReorderLibraryDecision
@@ -614,6 +615,7 @@ class HiddenIdentityForkChecker(private val registry: CardRegistry) {
         val fromFields: Map<EntityId, String> = when (masked) {
             is SelectCardsDecision -> masked.cardInfo.orEmpty().mapValues { it.value.name }
             is OrderObjectsDecision -> masked.cardInfo.orEmpty().mapValues { it.value.name }
+            is OrderTriggersDecision -> masked.triggers.associate { it.sourceId to it.sourceName }
             is SplitPilesDecision -> masked.cardInfo.orEmpty().mapValues { it.value.name }
             is SearchLibraryDecision -> masked.cards.mapValues { it.value.name }
             is ReorderLibraryDecision -> masked.cardInfo.mapValues { it.value.name }
@@ -632,6 +634,7 @@ class HiddenIdentityForkChecker(private val registry: CardRegistry) {
     private fun listedIds(masked: PendingDecision): Set<EntityId> = when (masked) {
         is SelectCardsDecision -> (masked.options + masked.nonSelectableOptions).toSet()
         is OrderObjectsDecision -> masked.objects.toSet()
+        is OrderTriggersDecision -> masked.triggers.flatMap { listOfNotNull(it.sourceId, it.triggeringEntityId) }.toSet()
         is SplitPilesDecision -> masked.cards.toSet()
         is SearchLibraryDecision -> masked.options.toSet()
         is ReorderLibraryDecision -> masked.cards.toSet()
@@ -657,6 +660,7 @@ class HiddenIdentityForkChecker(private val registry: CardRegistry) {
             is ChooseReplacementDecision -> masked.fromOptions + masked.toOptions
             is SelectCardsDecision -> listOfNotNull(masked.selectedLabel, masked.remainderLabel)
             is OrderObjectsDecision -> listOfNotNull(masked.orderingTitle, masked.firstLabel, masked.lastLabel)
+            is OrderTriggersDecision -> masked.triggers.map { it.text }
             else -> emptyList()
         }
         return listOfNotNull(masked.prompt, masked.context.effectHint) + specific

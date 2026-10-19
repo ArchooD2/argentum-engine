@@ -161,7 +161,11 @@ internal class JevActions(
             payXLifeAmount = if (c.payXLifeMaxX > 0) q.number("Choose life to pay", 0, c.payXLifeMaxX) else 0,
             variableCostPermanents = if (variableSacrifice)
                 select("Sacrifice for ${c.description}", c.validSacrificeTargets, c.sacrificeCount, c.validSacrificeTargets.size)
-            else cards("Tap creatures with total power at least ${c.tapForPowerRequired}", c.tapForPowerCreatures.map { it.entityId }),
+            else if (c.costType == "TapForTotalPower")
+                cards("Tap creatures with total power at least ${c.tapForPowerRequired}", c.tapForPowerCreatures.map { it.entityId })
+            // null, not empty: an empty list is the answer "none", and would skip the engine's own
+            // pause for an activated ability's variable-count cost.
+            else null,
             distributedCounterRemovals = removals,
         )
     }
@@ -194,7 +198,8 @@ internal class JevActions(
         sacrificedPermanents = a.sacrificedPermanents + b.sacrificedPermanents,
         discardedCards = a.discardedCards + b.discardedCards,
         exiledCards = a.exiledCards + b.exiledCards,
-        variableCostPermanents = a.variableCostPermanents + b.variableCostPermanents,
+        variableCostPermanents = if (a.variableCostPermanents == null && b.variableCostPermanents == null) null
+            else a.variableCostPermanents.orEmpty() + b.variableCostPermanents.orEmpty(),
         beheldCards = a.beheldCards + b.beheldCards,
         revealedCards = a.revealedCards + b.revealedCards,
         tappedPermanents = a.tappedPermanents + b.tappedPermanents,

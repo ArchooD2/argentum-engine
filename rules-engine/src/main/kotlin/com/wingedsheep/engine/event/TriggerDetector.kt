@@ -58,6 +58,8 @@ import com.wingedsheep.sdk.core.ManaCost
 import com.wingedsheep.sdk.core.Step
 import com.wingedsheep.sdk.core.Zone
 import com.wingedsheep.sdk.model.EntityId
+import com.wingedsheep.engine.core.LifeChangeReason
+import com.wingedsheep.engine.core.LifeChangedEvent
 import com.wingedsheep.sdk.scripting.predicates.ControllerPredicate
 import com.wingedsheep.sdk.scripting.*
 import com.wingedsheep.sdk.scripting.predicates.evaluateWith
@@ -397,6 +399,11 @@ class TriggerDetector(
         // (e.g., Deeproot Pilgrimage). Fires the trigger at most once per source regardless of how
         // many matching permanents were tapped simultaneously; the per-event path skips batch taps.
         detectTapBatchTriggers(state, events, triggers, index)
+
+        // Detect "whenever one or more [players] lose [exactly N] life" batching triggers
+        // (LifeLossEvent(batch = true), e.g. Ob Nixilis, Captive Kingpin). Fires once per life-loss
+        // occurrence (simultaneous damage summed per player); the per-event path skips them.
+        detectLifeLossBatchTriggers(state, events, triggers, index)
 
         // Detect "whenever you untap one or more permanents …" batching triggers (e.g. The
         // Millennium Calendar). The untap step untaps all your permanents in one batch; this fires
@@ -3248,6 +3255,80 @@ class TriggerDetector(
                 )
             }
         }
+    }
+
+    /**
+     * Detect "whenever one or more [players] lose life" / "… each lose exactly N life" batching
+     * triggers (`LifeLossEvent(batch = true)` — Ob Nixilis, Captive Kingpin).
+     *
+     * One action's event list can hold several life-loss *occurrences*, and the trigger fires once
+     * per occurrence in which a matching player lost life (with `exactAmount`, exactly that much):
+     *  - all damage in the list is one simultaneous occurrence, summed per player, so combat damage
+     *    from three 1/1s is one loss of 3 (Ob Nixilis ruling). First-strike and regular damage are
+     *    separate steps, so they arrive in separate lists.
+     *  - every other loss ("loses N life", radiation, a life payment) is split into runs: one
+     *    instruction makes each affected player lose life once, so a run ends when a player repeats —
+     *    "each opponent loses 1 life" is one occurrence, "loses 1 life, then loses 1 life" is two.
+     *
+     * However many players qualify within an occurrence, it fires once; the first qualifying player
+     * and their total are bound as the triggering player and `damageAmount`.
+     */
+    private fun detectLifeLossBatchTriggers(
+        state: GameState,
+        events: List<EngineGameEvent>,
+        triggers: MutableList<PendingTrigger>,
+        index: TriggerIndex
+    ) {
+        val occurrences = lifeLossOccurrences(events)
+        if (occurrences.isEmpty()) return
+
+        for (entry in index.getEntitiesForCategory(TriggerCategory.LIFE_LOSS)) {
+            for (ability in entry.abilities) {
+                val trigger = ability.trigger
+                if (trigger !is EventPattern.LifeLossEvent || !trigger.batch) continue
+                val exact = trigger.exactAmount
+                for (totals in occurrences) {
+                    val hit = totals.entries.firstOrNull { (playerId, lost) ->
+                        (exact == null || lost == exact) &&
+                            matcher.matchesPlayer(state, trigger.player, playerId, entry.controllerId)
+                    } ?: continue
+                    triggers.add(
+                        PendingTrigger(
+                            ability = ability,
+                            sourceId = entry.entityId,
+                            sourceName = entry.cardComponent.name,
+                            controllerId = entry.controllerId,
+                            triggerContext = TriggerContext(
+                                triggeringEntityId = hit.key,
+                                triggeringPlayerId = hit.key,
+                                damageAmount = hit.value
+                            )
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    /** Partitions an action's life loss into occurrences, each a per-player total; see [detectLifeLossBatchTriggers]. */
+    private fun lifeLossOccurrences(events: List<EngineGameEvent>): List<Map<EntityId, Int>> {
+        var damage: MutableMap<EntityId, Int>? = null
+        val occurrences = mutableListOf<Map<EntityId, Int>>()
+        var run: MutableMap<EntityId, Int>? = null
+        for (event in events) {
+            if (event !is LifeChangedEvent || event.reason == LifeChangeReason.LIFE_GAIN) continue
+            val lost = event.oldLife - event.newLife
+            if (lost <= 0) continue
+            if (event.reason == LifeChangeReason.DAMAGE) {
+                val totals = damage ?: mutableMapOf<EntityId, Int>().also { damage = it; occurrences.add(it) }
+                totals[event.playerId] = (totals[event.playerId] ?: 0) + lost
+                continue
+            }
+            val current = run?.takeUnless { event.playerId in it }
+                ?: mutableMapOf<EntityId, Int>().also { run = it; occurrences.add(it) }
+            current[event.playerId] = lost
+        }
+        return occurrences
     }
 
     /**

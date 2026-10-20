@@ -1,3 +1,31 @@
+// Adult Gold Dragon
+{
+    "name": "Adult Gold Dragon",
+    "manaCost": "{3}{R}{W}",
+    "typeLine": "Creature — Dragon",
+    "oracleText": "Flying, lifelink, haste",
+    "creatureStats": {
+        "power": 4,
+        "toughness": 3
+    },
+    "keywords": [
+        "FLYING",
+        "LIFELINK",
+        "HASTE"
+    ],
+    "metadata": {
+        "collectorNumber": "216",
+        "rarity": "RARE",
+        "artist": "Chris Rahn",
+        "flavorText": "Gold dragons are the greatest of the metallic dragons in size, power, and wisdom, and often take it upon themselves to safeguard mortal communities from evils that might threaten them.",
+        "imageUri": "https://cards.scryfall.io/normal/front/6/7/67a76010-d932-4727-8b5e-b8e2d14e1362.jpg?1783926450"
+    },
+    "colorIdentityOverride": [
+        "RED",
+        "WHITE"
+    ]
+}
+
 // Black Dragon
 {
     "name": "Black Dragon",
@@ -53,6 +81,117 @@
     },
     "colorIdentityOverride": [
         "BLACK"
+    ]
+}
+
+// Boots of Speed
+{
+    "name": "Boots of Speed",
+    "manaCost": "{R}",
+    "typeLine": "Artifact — Equipment",
+    "oracleText": "Equipped creature gets +1/+0 and has haste.\nEquip {1} ({1}: Attach to target creature you control. Equip only as a sorcery.)",
+    "script": {
+        "activatedAbilities": [
+            {
+                "id": "Boots of Speed:1",
+                "cost": {
+                    "type": "CostAtomWrapper",
+                    "atom": {
+                        "type": "AtomMana",
+                        "cost": "{1}"
+                    }
+                },
+                "effect": {
+                    "type": "AttachEquipment",
+                    "target": {
+                        "type": "BoundVariable",
+                        "name": "creature you control"
+                    }
+                },
+                "targetRequirements": [
+                    {
+                        "type": "TargetObject",
+                        "filter": {
+                            "baseFilter": "creature ctrl:you"
+                        },
+                        "id": "creature you control"
+                    }
+                ],
+                "timing": "SorcerySpeed",
+                "isEquipAbility": true
+            }
+        ],
+        "staticAbilities": [
+            {
+                "type": "ModifyStats",
+                "powerBonus": 1,
+                "toughnessBonus": 0
+            },
+            {
+                "type": "GrantKeyword",
+                "keyword": "HASTE"
+            }
+        ]
+    },
+    "equipCost": "{1}",
+    "metadata": {
+        "collectorNumber": "133",
+        "artist": "Chris Rallis",
+        "flavorText": "Click your heels and become the wind.",
+        "imageUri": "https://cards.scryfall.io/normal/front/d/b/db6d9913-3d4f-4f47-ba3a-6586a50ddbd7.jpg?1783926483"
+    },
+    "colorIdentityOverride": [
+        "RED"
+    ]
+}
+
+// Celestial Unicorn
+{
+    "name": "Celestial Unicorn",
+    "manaCost": "{2}{W}",
+    "typeLine": "Creature — Unicorn",
+    "oracleText": "Whenever you gain life, put a +1/+1 counter on this creature.",
+    "creatureStats": {
+        "power": 3,
+        "toughness": 2
+    },
+    "script": {
+        "triggeredAbilities": [
+            {
+                "id": "Celestial Unicorn:1",
+                "trigger": "LifeGainEvent",
+                "binding": "ANY",
+                "effect": {
+                    "type": "AddCounters",
+                    "counterType": "PLUS_ONE_PLUS_ONE",
+                    "count": 1,
+                    "target": "Self"
+                }
+            }
+        ]
+    },
+    "metadata": {
+        "collectorNumber": "5",
+        "artist": "Johannes Voss",
+        "flavorText": "When all hope fails, its light remains.",
+        "imageUri": "https://cards.scryfall.io/normal/front/f/2/f2d68812-8862-4e34-a992-7d6bbadaf316.jpg?1783926539",
+        "rulings": [
+            {
+                "date": "2021-07-23",
+                "text": "The ability of Celestial Unicorn triggers just once for each life-gaining event, whether it's 1 life from Dazzling Angel or 4 life from Apothecary Stomper."
+            },
+            {
+                "date": "2021-07-23",
+                "text": "If Celestial Unicorn is dealt lethal damage at the same time that you gain life, it won't receive a counter from its ability in time to save it."
+            },
+            {
+                "date": "2021-07-23",
+                "text": "If you gain an amount of life \"for each\" of something or \"equal to the number\" of something, that life is gained as one event and Celestial Unicorn's ability triggers only once."
+            }
+        ]
+    },
+    "colorIdentityOverride": [
+        "WHITE"
     ]
 }
 
@@ -585,6 +724,56 @@
     },
     "colorIdentityOverride": [
         "WHITE"
+    ]
+}
+
+// Old Gnawbone
+{
+    "name": "Old Gnawbone",
+    "manaCost": "{5}{G}{G}",
+    "typeLine": "Legendary Creature — Dragon",
+    "oracleText": "Flying\nWhenever a creature you control deals combat damage to a player, create that many Treasure tokens.",
+    "creatureStats": {
+        "power": 7,
+        "toughness": 7
+    },
+    "keywords": [
+        "FLYING"
+    ],
+    "script": {
+        "triggeredAbilities": [
+            {
+                "id": "Old Gnawbone:1",
+                "trigger": {
+                    "type": "DealsDamageEvent",
+                    "damageType": "DamageCombat",
+                    "recipient": {
+                        "type": "RecipientPlayer",
+                        "player": "Any"
+                    },
+                    "sourceFilter": "creature ctrl:you"
+                },
+                "binding": "ANY",
+                "effect": {
+                    "type": "CreatePredefinedToken",
+                    "tokenType": "Treasure",
+                    "dynamicCount": {
+                        "type": "ContextProperty",
+                        "key": "TRIGGER_DAMAGE_AMOUNT"
+                    }
+                }
+            }
+        ]
+    },
+    "metadata": {
+        "collectorNumber": "197",
+        "rarity": "MYTHIC",
+        "artist": "Filip Burburan",
+        "flavorText": "The ancient green dragon Claugiyliamatar is often seen with a mangled corpse dangling from her mouth.",
+        "imageUri": "https://cards.scryfall.io/normal/front/7/7/77ceba8b-de19-4db8-b5a7-f5df49bf241f.jpg?1783926458"
+    },
+    "colorIdentityOverride": [
+        "GREEN"
     ]
 }
 

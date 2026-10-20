@@ -6,6 +6,7 @@ import com.wingedsheep.engine.core.ActivateAbility
 import com.wingedsheep.engine.core.ExecutionResult
 import com.wingedsheep.engine.core.GameEvent
 import com.wingedsheep.engine.core.ManaAddedEvent
+import com.wingedsheep.engine.core.ManaAbilityResolvedEvent
 import com.wingedsheep.engine.core.Outcome
 import com.wingedsheep.engine.handlers.ConditionEvaluator
 import com.wingedsheep.engine.handlers.EffectContext
@@ -13,6 +14,7 @@ import com.wingedsheep.engine.handlers.PredicateContext
 import com.wingedsheep.engine.handlers.PredicateEvaluator
 import com.wingedsheep.engine.handlers.effects.EffectExecutorRegistry
 import com.wingedsheep.engine.handlers.effects.mana.ManaAbilityResolutionPipeline
+import com.wingedsheep.engine.handlers.effects.mana.manaAmountAdded
 import com.wingedsheep.engine.handlers.effects.mana.manaColorsAdded
 import com.wingedsheep.engine.registry.CardRegistry
 import com.wingedsheep.engine.state.GameState
@@ -191,7 +193,10 @@ internal class ActivatedManaAbilityResolver(
             activatedAbility = ability,
         )
 
-        if (currentState.activeManaSpendingScope(action.playerId) != null) {
+        // Runs the effect under a frame that finishes the activation — Damping Sphere, the
+        // ManaAbilityResolvedEvent, the tap bonuses — once *all* its parts have resolved,
+        // however many decisions they pause for.
+        fun runScoped(): ExecutionResult {
             val frame = com.wingedsheep.engine.core.ScopedManaProductionContinuation(
                 action.playerId, action.sourceId, sourceName, cardComponent,
                 currentState.getEntity(action.playerId)?.get<ManaPoolComponent>() ?: ManaPoolComponent(),
@@ -211,15 +216,17 @@ internal class ActivatedManaAbilityResolver(
                 completed, frame, activationEvents + result.events, manaPipeline,
             )
         }
+        if (currentState.activeManaSpendingScope(action.playerId) != null) return runScoped()
         val stateBeforeEffect = currentState
         val effectResult = effectExecutorRegistry.execute(currentState, finalEffect, context).toExecutionResult()
-        // A pause (e.g. choosing colors for "add X mana in any combination of colors") carries
+        // A pause (a color for "add one mana of any color", a split for "add X mana in any
+        // combination of colors") re-runs the effect — a pure function of the same state — under
+        // the scoped frame, so the activation finishes through one path once its last decision
+        // is answered instead of each resumer finishing it (or not) on its own. The pause carries
         // the activation's own events out with it, so the settle boundary queues the triggers
         // they cause (Wizard's Rockets' dies trigger, Ceaseless Searblades' activation trigger)
         // until the ability finishes resolving.
-        if (effectResult.outcome is Outcome.Paused) {
-            return ExecutionResult.propagatePause(effectResult.state, activationEvents + effectResult.events)
-        }
+        if (effectResult.outcome is Outcome.Paused) return runScoped()
         if (effectResult.outcome !is Outcome.Done) {
             return effectResult
         }
@@ -248,7 +255,15 @@ internal class ActivatedManaAbilityResolver(
             else -> manaAddedEvent(fe, stateBeforeActivation, currentState, action, activation, context)
         }
 
-        val eventsWithMana = if (manaEvent != null) activationEvents + manaEvent else activationEvents
+        // "Whenever a mana ability of this creature resolves" (Tyvar the Bellicose) — every mana
+        // ability, {T} or not, with what it produced after Damping Sphere and before the separate
+        // triggered mana abilities below.
+        val resolvedEvent = ManaAbilityResolvedEvent(
+            playerId = action.playerId,
+            sourceId = action.sourceId,
+            amount = if (dampening.dampened) 1 else manaAmountAdded(stateBeforeEffect, dampening.state, action.playerId),
+        )
+        val eventsWithMana = activationEvents + listOfNotNull(manaEvent, resolvedEvent)
         // Every color the activation added, read off the pool before tagging moves it into
         // per-unit entries — a composite's ManaAddedEvent reports only its first part.
         val producedColors = if (dampening.dampened) emptySet()

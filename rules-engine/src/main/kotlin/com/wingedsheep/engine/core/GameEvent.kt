@@ -1644,6 +1644,22 @@ data class LandTappedForManaEvent(
 ) : GameEvent
 
 /**
+ * A mana ability of [sourceId] resolved, producing [amount] mana for [playerId] — "whenever a mana
+ * ability of this creature resolves" ([com.wingedsheep.sdk.scripting.EventPattern.ManaAbilityResolved]).
+ * Emitted by the manual mana-ability pipeline for every mana ability (with or without {T}) and,
+ * through [tapForMana], by every auto-pay path that taps the source. A source sacrificed to pay
+ * (a Treasure) is gone before its ability resolves, so nothing of its can trigger. [amount] is what the ability itself produced, after
+ * replacements (Damping Sphere) and before separate triggered mana abilities (Mana Flare).
+ */
+@Serializable
+@SerialName("ManaAbilityResolvedEvent")
+data class ManaAbilityResolvedEvent(
+    val playerId: EntityId,
+    val sourceId: EntityId,
+    val amount: Int,
+) : GameEvent
+
+/**
  * A permanent was untapped.
  */
 @Serializable

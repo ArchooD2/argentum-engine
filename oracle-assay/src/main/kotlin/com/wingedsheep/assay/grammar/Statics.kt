@@ -41,6 +41,8 @@ import com.wingedsheep.sdk.scripting.GrantTriggeredAbility
 import com.wingedsheep.sdk.scripting.GrantWard
 import com.wingedsheep.sdk.scripting.ModifySpellCost
 import com.wingedsheep.sdk.scripting.ModifyStats
+import com.wingedsheep.sdk.scripting.MustAttack
+import com.wingedsheep.sdk.scripting.MustAttackDefender
 import com.wingedsheep.sdk.scripting.SetBasePowerToughnessStatic
 import com.wingedsheep.sdk.scripting.SpellCostTarget
 import com.wingedsheep.sdk.scripting.StaticAbility
@@ -466,6 +468,48 @@ object Statics {
             ability = { blockers, group -> CanOnlyBlockCreaturesWith(blockers!!, group) },
             read = { (it as? CanOnlyBlockCreaturesWith)?.let { r -> r.blockerFilter to r.filter } },
         ) + Subject.entries.mapNotNull(::attackingAloneEvasion)
+
+
+    /**
+     * Combat requirements — what a creature must do, where [combatRestrictions] say what it can't.
+     *
+     * "~ attacks each combat if able." (Phyrexian Juggernaut, Bloodrock Cyclops) and "Enchanted
+     * creature attacks each combat if able." are `MustAttack` over the source or the attached
+     * creature, and any legal defender satisfies them. "~ attacks a player each combat if able." is
+     * `MustAttackDefender.APlayer`: attacking a planeswalker or battle doesn't satisfy it while a
+     * player can be attacked.
+     *
+     * Singular subjects only: [restriction] prints one verb form for every subject, and a group
+     * subject takes "attack" rather than "attacks", so those need a rule of their own.
+     */
+    private val combatRequirements: List<Phrase<StaticAbility>> =
+        restriction<Unit>(
+            "attacks each combat if able",
+            "attacks each combat if able",
+            parameter = null,
+            ability = { _, group ->
+                MustAttack(group, MustAttackDefender.Any)
+            },
+            read = {
+                (it as? MustAttack)
+                    ?.takeIf { r -> r.defender == MustAttackDefender.Any }
+                    ?.let { r -> null to r.filter }
+            },
+            subjects = listOf(Subject.SOURCE, Subject.ATTACHED),
+        ) + restriction<Unit>(
+            "attacks a player each combat if able",
+            "attacks a player each combat if able",
+            parameter = null,
+            ability = { _, group ->
+                MustAttack(group, MustAttackDefender.APlayer)
+            },
+            read = {
+                (it as? MustAttack)
+                    ?.takeIf { r -> r.defender == MustAttackDefender.APlayer }
+                    ?.let { r -> null to r.filter }
+            },
+            subjects = listOf(Subject.SOURCE, Subject.ATTACHED),
+        )
 
     /**
      * "~ can't be blocked as long as it's attacking alone." — Gutter Skulker and five others;
@@ -1085,7 +1129,7 @@ object Statics {
         damageByToughness(qualified = false),
         damageByToughness(qualified = true),
         attachedDamageByToughness,
-    ) + combatRestrictions + compositeLord + Amounts.perScope(::selfPumpPerCount) + SpellCosts.all + lordStatic<Pair<Int, Int>, StaticAbility>(
+    ) + combatRestrictions + combatRequirements + compositeLord + Amounts.perScope(::selfPumpPerCount) + SpellCosts.all + lordStatic<Pair<Int, Int>, StaticAbility>(
         "get", "a group gets",
         parameter = Primitives.statModifiers,
         ability = { (power, toughness), group -> ModifyStats(power, toughness, group) },

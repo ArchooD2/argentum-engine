@@ -462,6 +462,49 @@
     }
 }
 
+// Eyes of the Beholder
+{
+    "name": "Eyes of the Beholder",
+    "manaCost": "{4}{B}{B}",
+    "typeLine": "Instant",
+    "oracleText": "Target creature gets -11/-11 until end of turn.",
+    "script": {
+        "spellEffect": {
+            "type": "ModifyStats",
+            "powerModifier": {
+                "type": "Fixed",
+                "amount": -11
+            },
+            "toughnessModifier": {
+                "type": "Fixed",
+                "amount": -11
+            },
+            "target": {
+                "type": "BoundVariable",
+                "name": "t0"
+            }
+        },
+        "targetRequirements": [
+            {
+                "type": "TargetObject",
+                "filter": {
+                    "baseFilter": "creature"
+                },
+                "id": "t0"
+            }
+        ]
+    },
+    "metadata": {
+        "collectorNumber": "101",
+        "artist": "Kari Christensen",
+        "flavorText": "In the end, there was nothing beautiful to be seen.",
+        "imageUri": "https://cards.scryfall.io/normal/front/3/f/3f9e5402-690f-497d-ada3-aa41fa900fdd.jpg?1783926497"
+    },
+    "colorIdentityOverride": [
+        "BLACK"
+    ]
+}
+
 // Gloom Stalker
 {
     "name": "Gloom Stalker",
@@ -510,6 +553,95 @@
     },
     "colorIdentityOverride": [
         "WHITE"
+    ]
+}
+
+// Grim Bounty
+{
+    "name": "Grim Bounty",
+    "manaCost": "{2}{B}{B}",
+    "typeLine": "Sorcery",
+    "oracleText": "Destroy target creature or planeswalker. Create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+    "script": {
+        "spellEffect": {
+            "type": "Composite",
+            "effects": [
+                {
+                    "type": "MoveToZone",
+                    "target": {
+                        "type": "BoundVariable",
+                        "name": "t0"
+                    },
+                    "destination": "Graveyard",
+                    "byDestruction": true
+                },
+                {
+                    "type": "CreatePredefinedToken",
+                    "tokenType": "Treasure"
+                }
+            ]
+        },
+        "targetRequirements": [
+            {
+                "type": "TargetCreatureOrPlaneswalker",
+                "id": "t0"
+            }
+        ]
+    },
+    "metadata": {
+        "collectorNumber": "106",
+        "artist": "Justine Cruz",
+        "flavorText": "Freed from the need to pay tribute to the dragon, the villages gladly paid the dragon-slayers instead.",
+        "imageUri": "https://cards.scryfall.io/normal/front/b/9/b98e0ab1-dea8-492b-a712-2057f2b1d020.jpg?1783926494",
+        "rulings": [
+            {
+                "date": "2021-07-23",
+                "text": "If the target is not legal as Grim Bounty tries to resolve, perhaps because the creature or planeswalker is no longer on the battlefield, it will do nothing. You will not create a Treasure token."
+            }
+        ]
+    },
+    "colorIdentityOverride": [
+        "BLACK"
+    ]
+}
+
+// Hoard Robber
+{
+    "name": "Hoard Robber",
+    "manaCost": "{1}{B}",
+    "typeLine": "Creature — Tiefling Rogue",
+    "oracleText": "Whenever this creature deals combat damage to a player, create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+    "creatureStats": {
+        "power": 1,
+        "toughness": 3
+    },
+    "script": {
+        "triggeredAbilities": [
+            {
+                "id": "Hoard Robber:1",
+                "trigger": {
+                    "type": "DealsDamageEvent",
+                    "damageType": "DamageCombat",
+                    "recipient": {
+                        "type": "RecipientPlayer",
+                        "player": "Any"
+                    }
+                },
+                "effect": {
+                    "type": "CreatePredefinedToken",
+                    "tokenType": "Treasure"
+                }
+            }
+        ]
+    },
+    "metadata": {
+        "collectorNumber": "110",
+        "artist": "Anna Pavleeva",
+        "flavorText": "\"And to think, a year ago I was picking pockets in Waterdeep.\"",
+        "imageUri": "https://cards.scryfall.io/normal/front/b/7/b723d9cd-05f5-4894-9f2b-52a434a3019c.jpg?1783926493"
+    },
+    "colorIdentityOverride": [
+        "BLACK"
     ]
 }
 
@@ -878,6 +1010,30 @@
     },
     "colorIdentityOverride": [
         "GREEN"
+    ]
+}
+
+// Steadfast Paladin
+{
+    "name": "Steadfast Paladin",
+    "manaCost": "{1}{W}",
+    "typeLine": "Creature — Dwarf Knight",
+    "oracleText": "Lifelink",
+    "creatureStats": {
+        "power": 2,
+        "toughness": 2
+    },
+    "keywords": [
+        "LIFELINK"
+    ],
+    "metadata": {
+        "collectorNumber": "38",
+        "artist": "Chris Rallis",
+        "flavorText": "\"When I made my oath to Moradin, I left selfishness and cowardice behind. Every battle, I make that commitment anew.\"",
+        "imageUri": "https://cards.scryfall.io/normal/front/a/2/a2c06b6e-faf5-467d-bfe1-9ff00be9e2f5.jpg?1783926524"
+    },
+    "colorIdentityOverride": [
+        "WHITE"
     ]
 }
 

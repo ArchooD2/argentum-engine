@@ -942,8 +942,8 @@ sealed interface CostReductionSource {
 
     /**
      * Reduces cost by [amountPerCreature] for each creature that was declared as an attacker this
-     * turn — by ANY player, not just the caster ("for each creature that attacked this turn" is
-     * not controller-scoped), and counting every combat phase this turn.
+     * turn — by any player, or only by the caster with [yoursOnly] ("for each creature that
+     * attacked this turn" is not controller-scoped), counting every combat phase this turn.
      *
      * The turn-history sibling of [PermanentsSacrificedThisTurn], and deliberately *not*
      * `PermanentsOnBattlefieldMatching(Creature.attackedThisTurn())`: that reads the live
@@ -956,13 +956,21 @@ sealed interface CostReductionSource {
      * attacked this turn"). Per its ruling the reduction never touches the colored part of the
      * cost, so it can't reduce below `{R}` — that clamping is the generic-reduction rail's, not
      * this source's.
+     *
+     * [yoursOnly] narrows the count to the caster's own attack declarations — "for each creature
+     * you attacked with this turn" (Search Party Captain). Same turn history, read from the
+     * caster's `PlayerAttackersThisTurnComponent` alone, so a creature that attacked and then
+     * died (or changed control) still counts for the player who declared it.
      */
     @SerialName("CreaturesThatAttackedThisTurn")
     @Serializable
     data class CreaturesThatAttackedThisTurn(
-        val amountPerCreature: Int = 1
+        val amountPerCreature: Int = 1,
+        val yoursOnly: Boolean = false
     ) : CostReductionSource {
-        override val description: String = "the number of creatures that attacked this turn"
+        override val description: String =
+            if (yoursOnly) "the number of creatures you attacked with this turn"
+            else "the number of creatures that attacked this turn"
     }
 
     /**
